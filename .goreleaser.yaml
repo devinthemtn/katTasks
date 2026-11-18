@@ -1,0 +1,57 @@
+# GoReleaser config: https://goreleaser.com/customization/
+# Run by .github/workflows/release.yml when a v* tag is pushed.
+# Try it locally: go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean
+version: 2
+
+project_name: katTasks
+
+before:
+  hooks:
+    - go mod tidy -diff # fails, without changing anything, if go.mod needs tidying
+    - go test ./...
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    wrap_in_directory: true
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge "
+  groups:
+    - title: New
+      regexp: '(?i)^(add|support|allow|make|use|rework|introduce)\b'
+      order: 0
+    - title: Fixes
+      regexp: '(?i)^(fix|keep|stop|handle|correct)\b'
+      order: 1
+    - title: Other changes
+      order: 999
+
+release:
+  header: |
+    See the [README](https://github.com/devinthemtn/katTasks#install) for install instructions.
+    Prebuilt binaries are below; `checksums.txt` has their SHA-256 sums.
+    The macOS builds aren't signed: if macOS blocks one, allow it in System Settings → Privacy & Security,
+    or run `xattr -d com.apple.quarantine katTasks`.
+
+    Or install with Go 1.24+: `go install github.com/devinthemtn/katTasks@{{ .Tag }}`

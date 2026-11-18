@@ -38,7 +38,7 @@ func main() {
 
 	switch {
 	case *showVersion:
-		fmt.Println("katTasks", Version)
+		fmt.Println("katTasks", Version())
 		return
 	case *makeConfig:
 		created, err := config.Make(*cfgPath)

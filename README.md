@@ -26,6 +26,9 @@ Requires Go 1.24 or newer.
 This puts `katTasks` in `$(go env GOPATH)/bin` (usually `~/go/bin`); make sure
 that's on your `PATH`. Or build from a checkout with `go build -o katTasks .`.
 
+Prebuilt binaries for Linux, macOS and Windows (x86-64 and ARM64) are on the
+[releases page](https://github.com/devinthemtn/katTasks/releases).
+
 ## Flags
 
 | flag | |
@@ -232,3 +235,19 @@ Changes print `{action, tasks, added, message}`.
 - Every save writes a temporary file and renames it over todo.txt, so a crash can't leave the file half-written.
 - If another program changes todo.txt while katTasks is open, edits are refused until you press `r` to reload. katTasks never overwrites those changes.
 - Archiving writes done.txt before removing anything from todo.txt.
+
+## Releasing
+
+Releases are built by [GoReleaser](https://goreleaser.com) in GitHub Actions
+(`.github/workflows/release.yml`, configured by `.goreleaser.yaml`). Pushing a
+tag runs the tests, builds every platform, and publishes the release with
+archives, checksums and a changelog from the commits:
+
+    git tag -a v0.3.0 -m "katTasks 0.3.0"
+    git push origin v0.3.0
+
+The tag is the version: `katTasks -version` reports it, and there is nothing to
+bump in the code. Edit the generated notes on GitHub afterwards if you like. To
+try the build without publishing, run the workflow by hand (Actions → release
+→ Run workflow); the archives are attached to the run. Locally:
+`go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean`.

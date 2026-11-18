@@ -36,7 +36,11 @@ func (m Model) View() string {
 	if m.width == 0 {
 		return "loading…"
 	}
-	return lipgloss.JoinVertical(lipgloss.Left, m.viewHeader(), m.viewBody(), m.viewFooter())
+	body := m.viewBody()
+	if m.mode == modeAdd || m.mode == modeEdit {
+		body = overlay(body, m.viewTaskPopup(m.width))
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, m.viewHeader(), body, m.viewFooter())
 }
 
 func (m Model) viewHeader() string {
@@ -306,8 +310,12 @@ func (st styles) dueLabel(d, now time.Time) (string, lipgloss.Style) {
 func (m Model) viewFooter() string {
 	var l1, l2 string
 	switch m.mode {
-	case modeAdd, modeEdit, modeFilter, modeSaveName:
-		label := map[mode]string{modeAdd: "add", modeEdit: "edit", modeFilter: "filter", modeSaveName: "save search as"}[m.mode]
+	case modeAdd, modeEdit:
+		// The popup in the middle of the screen has the input and its help.
+		l1 = m.st.prompt.Render(map[mode]string{modeAdd: " add task", modeEdit: " edit task"}[m.mode])
+		l2 = m.st.faint.Render(" enter save · esc cancel")
+	case modeFilter, modeSaveName:
+		label := map[mode]string{modeFilter: "filter", modeSaveName: "save search as"}[m.mode]
 		l1 = m.st.prompt.Render(" "+label+" › ") + m.input.View()
 		if len(m.sugg) > 0 {
 			var ss []string
@@ -323,8 +331,6 @@ func (m Model) viewFooter() string {
 			l2 = m.st.faint.Render(" +proj @ctx due:+1w due:-3d due:overdue pri:A-C -word \"a phrase\" · enter keep · esc clear")
 		} else if m.mode == modeSaveName {
 			l2 = m.st.faint.Render(" saves " + m.currentQuery() + " to [filters] in " + m.opts.ConfigPath)
-		} else {
-			l2 = m.st.faint.Render(" enter save · esc cancel · tab completes +project @context due:")
 		}
 	case modeConfirm:
 		l1 = m.st.prompt.Render(" " + m.confirm)

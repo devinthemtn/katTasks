@@ -131,7 +131,9 @@ add = ["n", "ctrl+n"]
 Keys are written like `ctrl+u`, `alt+x`, `shift+tab`, `enter`, `esc`, `space`,
 `tab`, `up`, `pgdown` or `f5`.
 
-While typing a task, `tab` completes `+project`, `@context`, `due:` and `rec:`
+Adding (`a`) or editing a task opens a small box in the middle of the screen,
+with a reminder of the `(A)`, `+project`, `@context`, `due:` and `rec:` syntax
+underneath. While typing a task, `tab` completes `+project`, `@context`, `due:` and `rec:`
 words. Relative due dates are converted to `YYYY-MM-DD` when you save:
 `due:today`, `due:tomorrow`, `due:fri`, `due:+3d`, `due:+2w`, `due:+1m`. When a
 project or context is selected in the sidebar, `a` fills it in for you.

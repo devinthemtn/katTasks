@@ -32,7 +32,13 @@ func (m Model) viewTaskPopup(maxW int) string {
 				ss = append(ss, m.st.suggest.Render(" "+s+" "))
 			}
 		}
-		lines = append(lines, ansi.Truncate(strings.Join(ss, ""), w, "…"))
+		row := strings.Join(ss, "")
+		if m.isScriptSuggestion() {
+			if d := m.scriptDesc(m.sugg[m.suggIdx]); d != "" {
+				row += m.st.faint.Render("  " + d)
+			}
+		}
+		lines = append(lines, ansi.Truncate(row, w, "…"))
 	} else {
 		lines = append(lines, "")
 	}
@@ -43,6 +49,7 @@ func (m Model) viewTaskPopup(maxW int) string {
 		m.st.project.Render("+project ") + m.st.context.Render("@context ") + m.st.tag.Render("key:value"),
 		m.st.tag.Render("due:") + m.st.faint.Render("today tomorrow fri +3d +2w +1m 2026-12-01"),
 		m.st.tag.Render("rec:") + m.st.faint.Render("1w 3d 5b 1m 1y · rec:+1w counts from due"),
+		key("/name ") + m.st.faint.Render("run a Lua script from scripts/"),
 		"",
 		key("enter") + m.st.faint.Render(" save · ") + key("esc") + m.st.faint.Render(" cancel · ") +
 			key("tab") + m.st.faint.Render(" complete · ") + key("↑↓") + m.st.faint.Render(" choose"),

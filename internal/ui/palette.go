@@ -28,11 +28,13 @@ func (m *Model) paletteItems() []paletteItem {
 		})
 	}
 	items = append(items, m.savedFilterItems()...)
+	items = append(items, m.scriptPaletteItems()...)
 	return items
 }
 
 func (m *Model) openPalette() {
 	m.mode = modePalette
+	m.loadScripts()
 	m.palItems = m.paletteItems()
 	m.palIdx = 0
 	m.input.SetValue("")

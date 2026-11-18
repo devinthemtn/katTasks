@@ -15,6 +15,7 @@ katTasks [flags] COMMAND ARGS...  run one command and exit (see Command line)
 - Every key can be rebound, and you can pick or write your own color theme.
 - A search language: `+Work due:+1w -@waiting pri:A-C`.
 - `rec:` recurring tasks, `due:` dates you can type as `due:fri`, and archiving to `done.txt`.
+- Lua scripts, run from `:` or as `/name` while typing a task.
 - todo.sh-style commands (`katTasks add …`, `katTasks ls …`, `katTasks do 3`), with `-json` output.
 
 ## Install
@@ -175,6 +176,50 @@ month, so Jan 31 plus a month is Feb 28.
 
 Completing a task drops its priority, as todo.sh does, but keeps it as a
 `pri:X` tag so reopening the task restores it.
+
+## Lua scripts
+
+Put `.lua` files in a `scripts/` folder next to config.toml (on Linux
+`~/.config/katTasks/scripts/`). A `-- comment` on the first line becomes the
+script's description. Each script `NAME.lua` can be run two ways:
+
+- **From `:`** as `script:NAME`. It works on the task under the cursor, and a
+  returned string is shown in the footer.
+- **While typing a task**, as a `/NAME` word. Typing `/` suggests up to five
+  matching scripts; `tab` runs the highlighted one, and any `/NAME` still in
+  the text runs when you press `enter`. What the script returns replaces the
+  word, so `return nil` removes it. A `/word` that isn't a script is kept.
+
+Scripts get a `kat` table:
+
+| | |
+|---|---|
+| `kat.input` | the task being typed, without the `/NAME` word (`""` from `:`) |
+| `kat.task` | the task under the cursor (or being edited), or `nil` |
+| `kat.tasks()` | every task in todo.txt |
+| `kat.today` | today as `YYYY-MM-DD` |
+| `kat.date(s)` | `"fri"`, `"+3d"`, `"tomorrow"`… as `YYYY-MM-DD`, or `nil` |
+| `kat.add(line)` | add a task |
+| `kat.update(line)` | replace the task under the cursor (from `:` only) |
+| `kat.status(msg)` | show a message in the footer; `print` does the same |
+
+A task is a table with `line`, `text`, `done`, `priority`, `due`, `projects`,
+`contexts` and `tags` (`tags.id` for `id:7`). Everything a script adds or
+changes is one undo step, and a script is stopped after 2 seconds. Scripts are
+read again each time you open `:` or start typing a task, so new ones show up
+without a restart.
+
+```lua
+-- due a week from today
+return "due:" .. kat.date("+1w")
+```
+
+```lua
+-- copy this task to next week
+local t = kat.task
+if not t then return "no task" end
+kat.add(t.text:gsub("due:%S+", "") .. " due:" .. kat.date("+1w"))
+```
 
 ## Themes
 

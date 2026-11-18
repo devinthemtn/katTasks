@@ -110,6 +110,7 @@ func (m Model) inputHelp() string {
 		"enter      save        esc  cancel",
 		"due:       today, tomorrow, mon..sun, +3d, +2w, +1m",
 		"rec:       1d 2w 1m 1y 5b (b = business days); rec:+1w = from due date",
+		"/name      run a Lua script from scripts/ (tab, or when saving)",
 	}, "\n"))
 }
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/devinthemtn/katTasks/internal/config"
 	"github.com/devinthemtn/katTasks/internal/query"
+	"github.com/devinthemtn/katTasks/internal/script"
 	"github.com/devinthemtn/katTasks/internal/theme"
 	"github.com/devinthemtn/katTasks/internal/todo"
 )
@@ -123,9 +124,10 @@ type Model struct {
 
 	st       styles
 	themes   []theme.Theme
-	theme    string // name of the theme in use
-	pickIdx  int    // theme picker cursor
-	pickPrev string // theme to restore if the picker is cancelled
+	theme    string          // name of the theme in use
+	pickIdx  int             // theme picker cursor
+	pickPrev string          // theme to restore if the picker is cancelled
+	scripts  []script.Script // Lua scripts in the scripts folder
 	palItems []paletteItem
 	palShown []int // indexes into palItems that match the query, best first
 	palIdx   int
@@ -187,6 +189,7 @@ func (m *Model) applyConfig(cfg config.Config) []error {
 		errs = append(errs, fmt.Errorf("theme = %q: no such theme (built-in: default, terminal, nord, gruvbox; or a file in %s)", cfg.Theme, theme.Dir(cfg.Dir())))
 		m.useTheme("default")
 	}
+	m.loadScripts()
 	return errs
 }
 
@@ -705,6 +708,9 @@ func (m *Model) startInput(val string, cursor int) {
 		m.input.SetCursor(cursor)
 	}
 	m.input.Focus()
+	if m.mode == modeAdd || m.mode == modeEdit {
+		m.loadScripts()
+	}
 	m.updateSuggestions()
 }
 
@@ -742,6 +748,9 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.input.Blur()
 		return m, nil
 	case "enter":
+		if (m.mode == modeAdd || m.mode == modeEdit) && !m.expandScripts() {
+			return m, nil // the script's error is in the footer; keep typing
+		}
 		m.submitInput()
 		return m, nil
 	case "tab":
@@ -845,6 +854,14 @@ func (m *Model) updateSuggestions() {
 	lw := strings.ToLower(w)
 	var pool []string
 	switch {
+	case w[0] == '/' && (m.mode == modeAdd || m.mode == modeEdit):
+		m.sugg = m.scriptSuggestions(w)
+		for i, s := range m.sugg {
+			if s == prev {
+				m.suggIdx = i
+			}
+		}
+		return
 	case w[0] == '+' || w[0] == '@':
 		pool = m.known
 	case len(lw) >= 3 && (strings.HasPrefix("due:", lw) || strings.HasPrefix(lw, "due:") ||
@@ -876,6 +893,13 @@ func (m *Model) acceptSuggestion() {
 	s := m.sugg[m.suggIdx]
 	val := []rune(m.input.Value())
 	end := start + len([]rune(w))
+	if m.isScriptSuggestion() {
+		if sc, ok := m.findScript(s[1:]); ok {
+			m.runInlineScript(sc, start, end)
+		}
+		m.updateSuggestions()
+		return
+	}
 	rest := val[end:]
 	ins := []rune(s)
 	if len(rest) == 0 || rest[0] != ' ' {

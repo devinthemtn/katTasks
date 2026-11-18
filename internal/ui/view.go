@@ -55,7 +55,7 @@ func (m Model) viewHeader() string {
 		parts = append(parts, fmt.Sprintf("filter: %q", m.filter))
 	}
 	right := sFaint.Render(strings.Join(parts, " · ") + " ")
-	path := m.cfg.TodoFile
+	path := m.cfg.Files.Todo
 	if home, err := os.UserHomeDir(); err == nil && strings.HasPrefix(path, home+"/") {
 		path = "~" + path[len(home):]
 	}
@@ -294,6 +294,8 @@ func (m Model) viewFooter() string {
 				st = sError
 			}
 			l1 = " " + st.Render(m.status)
+		} else if m.configWarn != "" {
+			l1 = " " + sError.Render("⚠ "+m.configWarn) + sFaint.Render("  (fix, then ctrl+r)")
 		}
 		m.help.ShowAll = false
 		l2 = " " + m.help.View(m.keys)

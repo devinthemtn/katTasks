@@ -34,7 +34,7 @@ const (
 	modeConfirm
 )
 
-var sortModes = []string{"priority", "due", "created", "file"}
+var sortModes = config.SortModes
 
 type entryKind int
 
@@ -78,6 +78,7 @@ const maxUndo = 50
 
 // Model is the Bubble Tea model.
 type Model struct {
+	opts    Options
 	cfg     config.Config
 	tasks   []*todo.Task
 	modTime time.Time
@@ -105,8 +106,9 @@ type Model struct {
 	confirm   string
 	onConfirm func(*Model)
 
-	status    string
-	statusErr bool
+	status     string
+	statusErr  bool
+	configWarn string // settings problems, shown until fixed and reloaded
 
 	keys     keyMap
 	help     help.Model
@@ -115,38 +117,88 @@ type Model struct {
 	width, height int
 }
 
+// Options configure New.
+type Options struct {
+	ConfigPath string  // settings file, re-read by Ctrl-r
+	TodoFile   string  // -file override; empty uses files.todo
+	Errors     []error // problems found while loading the settings
+}
+
 // New builds the model and loads the todo file.
-func New(cfg config.Config) (Model, error) {
+func New(cfg config.Config, opts Options) (Model, error) {
 	ti := textinput.New()
 	ti.Prompt = ""
 	ti.CharLimit = 0
 
 	m := Model{
-		cfg:      cfg,
-		hideDone: cfg.HideCompleted,
-		input:    ti,
-		keys:     newKeyMap(),
-		help:     help.New(),
+		opts:  opts,
+		input: ti,
+		keys:  newKeyMap(),
+		help:  help.New(),
 	}
-	for i, s := range sortModes {
-		if s == cfg.DefaultSort {
-			m.sortIdx = i
-		}
-	}
+	m.applyConfig(cfg)
+	m.hideDone = cfg.View.HideCompleted
+	m.showConfigErrors(opts.Errors)
 	if err := m.load(); err != nil {
 		return m, err
 	}
 	return m, nil
 }
 
+// applyConfig installs settings, from startup or a Ctrl-r reload.
+func (m *Model) applyConfig(cfg config.Config) {
+	if m.opts.TodoFile != "" {
+		cfg.SetTodo(m.opts.TodoFile)
+	}
+	m.cfg = cfg
+	for i, s := range sortModes {
+		if s == cfg.View.Sort {
+			m.sortIdx = i
+		}
+	}
+}
+
+func (m *Model) showConfigErrors(errs []error) {
+	m.configWarn = ""
+	if len(errs) == 0 {
+		return
+	}
+	msgs := make([]string, len(errs))
+	for i, e := range errs {
+		msgs[i] = e.Error()
+	}
+	m.configWarn = strings.Join(msgs, "; ")
+}
+
 func (m *Model) load() error {
-	tasks, mt, err := todo.Load(m.cfg.TodoFile)
+	tasks, mt, err := todo.Load(m.cfg.Files.Todo)
 	if err != nil {
 		return err
 	}
 	m.tasks, m.modTime = tasks, mt
 	m.refresh(nil)
 	return nil
+}
+
+// reloadConfig re-reads the settings file, and the todo file if its path
+// changed.
+func (m *Model) reloadConfig() {
+	cfg, _, errs := config.Load(m.opts.ConfigPath)
+	oldTodo := m.cfg.Files.Todo
+	m.applyConfig(cfg)
+	if m.cfg.Files.Todo != oldTodo {
+		m.undo = nil
+		if err := m.load(); err != nil {
+			errs = append(errs, err)
+		}
+	} else {
+		m.refresh(nil)
+	}
+	if len(errs) > 0 {
+		m.showConfigErrors(errs)
+		return
+	}
+	m.setStatus("settings reloaded from %s", m.opts.ConfigPath)
 }
 
 // Init implements tea.Model.
@@ -397,7 +449,7 @@ func cloneAll(ts []*todo.Task) []*todo.Task {
 // stale reports whether todo.txt was modified by another program since we
 // last read or wrote it.
 func (m *Model) stale() bool {
-	return !todo.ModTime(m.cfg.TodoFile).Equal(m.modTime)
+	return !todo.ModTime(m.cfg.Files.Todo).Equal(m.modTime)
 }
 
 // mutate applies fn to the task list and saves, refusing if the file has
@@ -416,7 +468,7 @@ func (m *Model) mutate(fn func()) bool {
 }
 
 func (m *Model) save() bool {
-	mt, err := todo.Save(m.cfg.TodoFile, m.tasks)
+	mt, err := todo.Save(m.cfg.Files.Todo, m.tasks)
 	if err != nil {
 		m.setError("save failed: %v", err)
 		return false
@@ -446,7 +498,7 @@ func (m *Model) archive(ts []*todo.Task) {
 		m.setError("todo.txt changed on disk — press r to reload first")
 		return
 	}
-	if err := todo.Append(m.cfg.DoneFile, ts); err != nil {
+	if err := todo.Append(m.cfg.Files.Done, ts); err != nil {
 		m.setError("archive failed: %v", err)
 		return
 	}
@@ -457,7 +509,7 @@ func (m *Model) archive(ts []*todo.Task) {
 	m.removeTasks(rm)
 	if m.save() {
 		m.undo = nil
-		m.setStatus("archived %d task(s) to %s", len(ts), m.cfg.DoneFile)
+		m.setStatus("archived %d task(s) to %s", len(ts), m.cfg.Files.Done)
 	}
 	m.refresh(nil)
 }
@@ -604,16 +656,18 @@ func (m Model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setStatus("no completed tasks to archive")
 			break
 		}
-		m.ask(fmt.Sprintf("Move %d completed task(s) to %s? This can't be undone. (y/n)", len(done), m.cfg.DoneFile),
+		m.ask(fmt.Sprintf("Move %d completed task(s) to %s? This can't be undone. (y/n)", len(done), m.cfg.Files.Done),
 			func(m *Model) { m.archive(done) })
 	case key.Matches(msg, k.Undo):
 		m.undoLast()
+	case msg.String() == "ctrl+r":
+		m.reloadConfig()
 	case key.Matches(msg, k.Reload):
 		if err := m.load(); err != nil {
 			m.setError("reload failed: %v", err)
 		} else {
 			m.undo = nil
-			m.setStatus("reloaded %s (%d tasks)", m.cfg.TodoFile, len(m.tasks))
+			m.setStatus("reloaded %s (%d tasks)", m.cfg.Files.Todo, len(m.tasks))
 		}
 	}
 	return m, nil
@@ -723,7 +777,7 @@ func (m *Model) toggle() {
 		}
 	}
 
-	if m.cfg.AutoArchive {
+	if m.cfg.Tasks.AutoArchive {
 		if m.stale() {
 			m.setError("todo.txt changed on disk — press r to reload first")
 			return
@@ -881,7 +935,7 @@ func (m *Model) submitInput() {
 		}
 		t := todo.Parse(val)
 		t.NormalizeDue(time.Now())
-		if m.cfg.AddCreationDate && t.Created.IsZero() && !t.Done {
+		if m.cfg.Tasks.AddCreationDate && t.Created.IsZero() && !t.Done {
 			y, mo, d := time.Now().Date()
 			t.Created = time.Date(y, mo, d, 0, 0, 0, 0, time.Local)
 		}

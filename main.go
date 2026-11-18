@@ -13,25 +13,68 @@ import (
 )
 
 func main() {
-	cfgPath := flag.String("config", config.DefaultPath(), "path to config.toml")
+	fs := flag.CommandLine
+	cfgPath := fs.String("config", config.DefaultPath(), "settings file")
+	todoFile := fs.String("file", "", "todo.txt to open (overrides files.todo)")
+	makeConfig := fs.Bool("makeconfig", false, "create the settings file with every default, then exit")
+	updateConfig := fs.Bool("updateconfig", false, "add settings missing from the settings file (e.g. new in this version) as comments, then exit")
+	showVersion := fs.Bool("version", false, "print the version, then exit")
+	fs.Usage = func() {
+		out := fs.Output()
+		fmt.Fprintf(out, "Usage: katTasks [flags]\n\n")
+		fs.PrintDefaults()
+		fmt.Fprintf(out, "\nSettings: %s\n", *cfgPath)
+	}
 	flag.Parse()
 
-	cfg, created, err := config.Load(*cfgPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "katTasks: config %s: %v\n", *cfgPath, err)
-		os.Exit(1)
+	switch {
+	case *showVersion:
+		fmt.Println("katTasks", Version)
+		return
+	case *makeConfig:
+		created, err := config.Make(*cfgPath)
+		exitIf(err)
+		if created {
+			fmt.Println("created", *cfgPath)
+		} else {
+			fmt.Println(*cfgPath, "already exists; left unchanged (try -updateconfig)")
+		}
+		return
+	case *updateConfig:
+		added, created, err := config.Update(*cfgPath)
+		exitIf(err)
+		switch {
+		case created:
+			fmt.Println("created", *cfgPath)
+		case len(added) == 0:
+			fmt.Println(*cfgPath, "already has every setting")
+		default:
+			fmt.Printf("added %d setting(s) to %s as comments:\n", len(added), *cfgPath)
+			for _, a := range added {
+				fmt.Println("  " + a)
+			}
+		}
+		return
 	}
-	if created {
-		fmt.Fprintf(os.Stderr, "katTasks: wrote default config to %s\n", *cfgPath)
+	if fs.NArg() > 0 {
+		fs.Usage()
+		os.Exit(2)
 	}
 
-	m, err := ui.New(cfg)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "katTasks: %s: %v\n", cfg.TodoFile, err)
-		os.Exit(1)
+	cfg, created, errs := config.Load(*cfgPath)
+	if created {
+		fmt.Fprintf(os.Stderr, "katTasks: wrote default settings to %s\n", *cfgPath)
 	}
+	m, err := ui.New(cfg, ui.Options{ConfigPath: *cfgPath, TodoFile: *todoFile, Errors: errs})
+	exitIf(err)
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "katTasks: %v\n", err)
+		exitIf(err)
+	}
+}
+
+func exitIf(err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "katTasks:", err)
 		os.Exit(1)
 	}
 }

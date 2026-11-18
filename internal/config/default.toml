@@ -1,0 +1,54 @@
+# katTasks settings.
+#
+# Every setting is optional; anything left out uses the value shown here.
+# Press Ctrl-r in katTasks to apply changes. Run katTasks -updateconfig after
+# upgrading to add new settings to this file as comments.
+
+# Color theme: a built-in ("default", "terminal", "nord", "gruvbox") or the
+# name of a file in the themes/ folder next to this file (without .toml).
+# Press T in katTasks to pick one; katTasks -maketheme NAME writes a copy of
+# the current theme to edit.
+theme = "default"
+
+[files]
+# Your todo.txt. "~" and $VARIABLES are expanded. katTasks -file overrides it.
+todo = "~/todo.txt"
+# Where archived (completed) tasks go. Empty means done.txt next to todo.
+done = ""
+
+[tasks]
+# Prefix new tasks with today's date.
+add_creation_date = true
+# Move tasks to the done file as soon as they are completed.
+auto_archive = false
+
+[view]
+# Start with completed tasks hidden (H toggles).
+hide_completed = false
+# Starting sort: "priority", "due", "created" or "file" (s cycles).
+sort = "priority"
+# Show task numbers, the ones the command line uses (L toggles).
+line_numbers = false
+# key:value tags to hide from the task list, e.g. ["uid", "sync"]. They stay
+# in the file and can still be searched.
+hide_keys = []
+
+[clipboard]
+# Command that also receives copied text on stdin, e.g. "wl-copy", "xclip
+# -selection clipboard" or "clip.exe" under WSL. Copying always uses the
+# terminal's OSC 52 escape too; empty uses only that.
+command = ""
+
+[keys]
+# Rebind any action: name = "key" or ["key", "other key"]. Keys use names
+# like "ctrl+u", "enter", "space", "tab"; two plain characters such as "gg"
+# are a chord. A key you bind here stops doing its default action. Press :
+# in katTasks to see every action name and its current keys.
+# add = ["a", "n"]
+# top = "gg"
+
+[filters]
+# Saved searches: name = "query". They show in the sidebar under SAVED.
+# Press fs to save the current search, ff to jump to them.
+# work-week = "+Work due:+1w"
+# urgent = "pri:A-B -@waiting"

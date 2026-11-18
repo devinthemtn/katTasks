@@ -34,20 +34,22 @@ checksum:
 
 changelog:
   sort: asc
+  abbrev: 7
   filters:
     exclude:
       - "^Merge "
   groups:
     - title: New
-      regexp: '(?i)^(add|support|allow|make|use|rework|introduce)\b'
+      regexp: '(?i)^[0-9a-f]+ (add|support|allow|make|use|rework|introduce|build)\b'
       order: 0
     - title: Fixes
-      regexp: '(?i)^(fix|keep|stop|handle|correct)\b'
+      regexp: '(?i)^[0-9a-f]+ (fix|keep|stop|handle|correct)\b'
       order: 1
     - title: Other changes
       order: 999
 
 release:
+  name_template: "katTasks {{ .Version }}"
   header: |
     See the [README](https://github.com/devinthemtn/katTasks#install) for install instructions.
     Prebuilt binaries are below; `checksums.txt` has their SHA-256 sums.

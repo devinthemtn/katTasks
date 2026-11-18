@@ -94,6 +94,8 @@ func defineActions() []*action {
 			m.startInput(m.filter, -1)
 			return nil
 		}},
+		{name: "save_search", desc: "save current search", group: groupView, defaults: []string{"fs"}, run: func(m *Model) tea.Cmd { m.startSaveFilter(); return nil }},
+		{name: "saved_searches", desc: "go to saved searches", group: groupView, defaults: []string{"ff"}, run: func(m *Model) tea.Cmd { m.jumpToSaved(); return nil }},
 		{name: "clear_filter", desc: "clear filter / selection", group: groupView, defaults: []string{"esc"}, run: func(m *Model) tea.Cmd {
 			if m.visual {
 				m.endVisual()

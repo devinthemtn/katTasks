@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/devinthemtn/katTasks/internal/config"
+	"github.com/devinthemtn/katTasks/internal/query"
 	"github.com/devinthemtn/katTasks/internal/theme"
 	"github.com/devinthemtn/katTasks/internal/todo"
 )
@@ -33,6 +34,7 @@ const (
 	modeConfirm
 	modeTheme
 	modePalette
+	modeSaveName
 )
 
 var sortModes = config.SortModes
@@ -45,11 +47,13 @@ const (
 	entryHeader
 	entryProject
 	entryContext
+	entrySaved
 )
 
 type sideEntry struct {
 	kind  entryKind
-	value string
+	value string      // project, context, or saved search name
+	q     query.Query // entrySaved
 	count int
 }
 
@@ -71,6 +75,8 @@ func (e sideEntry) match(t *todo.Task) bool {
 		return ok
 	case entryProject, entryContext:
 		return t.Has(e.value)
+	case entrySaved:
+		return e.q.Match(t, time.Now())
 	}
 	return true
 }
@@ -102,6 +108,7 @@ type Model struct {
 	sortIdx  int
 	hideDone bool
 	filter   string
+	q        query.Query // parsed filter
 
 	input     textinput.Model
 	editing   *todo.Task
@@ -272,7 +279,8 @@ func (m *Model) refresh(keep *todo.Task) {
 	m.buildSidebar()
 
 	entry := m.currentEntry()
-	needle := strings.ToLower(m.filter)
+	m.q = query.Parse(m.filter)
+	now := time.Now()
 	m.visible = m.visible[:0]
 	for _, t := range m.tasks {
 		if m.hideDone && t.Done {
@@ -281,7 +289,7 @@ func (m *Model) refresh(keep *todo.Task) {
 		if !entry.match(t) {
 			continue
 		}
-		if needle != "" && !strings.Contains(strings.ToLower(t.String()), needle) {
+		if !m.q.Match(t, now) {
 			continue
 		}
 		m.visible = append(m.visible, t)
@@ -334,6 +342,19 @@ func (m *Model) buildSidebar() {
 	}
 
 	m.side = []sideEntry{{kind: entryAll, count: pending}, {kind: entryDue, count: due}}
+	if names := m.cfg.FilterNames(); len(names) > 0 {
+		m.side = append(m.side, sideEntry{kind: entryHeader, value: "SAVED"})
+		now := time.Now()
+		for _, n := range names {
+			e := sideEntry{kind: entrySaved, value: n, q: query.Parse(m.cfg.Filters[n])}
+			for _, t := range m.tasks {
+				if !t.Done && e.q.Match(t, now) {
+					e.count++
+				}
+			}
+			m.side = append(m.side, e)
+		}
+	}
 	add := func(title string, kind entryKind, set map[string]int) {
 		if len(set) == 0 {
 			return
@@ -509,7 +530,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		typing := m.mode == modeAdd || m.mode == modeEdit || m.mode == modeFilter || m.mode == modePalette
+		typing := m.mode == modeAdd || m.mode == modeEdit || m.mode == modeFilter || m.mode == modePalette || m.mode == modeSaveName
 		// Keys typed quickly can arrive as one multi-rune message; outside
 		// text entry handle them one at a time, so e.g. "pB" sets priority B.
 		if !typing && msg.Type == tea.KeyRunes && len(msg.Runes) > 1 && !msg.Paste {
@@ -523,7 +544,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return mdl, tea.Batch(cmds...)
 		}
 		switch m.mode {
-		case modeAdd, modeEdit, modeFilter:
+		case modeAdd, modeEdit, modeFilter, modeSaveName:
 			return m.updateInput(msg)
 		case modePalette:
 			return m.updatePalette(msg)
@@ -756,6 +777,8 @@ func (m *Model) submitInput() {
 	m.sugg = nil
 
 	switch md {
+	case modeSaveName:
+		m.saveFilter(val)
 	case modeFilter:
 		m.filter = val
 		m.refresh(nil)

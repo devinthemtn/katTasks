@@ -128,6 +128,8 @@ func (m Model) viewSidebar(w, h int) string {
 			ls = m.st.project
 		case entryContext:
 			ls = m.st.context
+		case entrySaved:
+			ls = m.st.prompt.UnsetBold()
 		default:
 			ls = m.st.text
 		}
@@ -256,7 +258,11 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 			}
 			st = m.st.tag
 		}
-		parts = append(parts, on(st).Render(word))
+		st = on(st)
+		if !t.Done && m.q.Highlights(word) {
+			st = st.Background(m.st.matchBg)
+		}
+		parts = append(parts, st.Render(word))
 	}
 	text := strings.Join(parts, on(m.st.text).Render(" "))
 
@@ -300,8 +306,8 @@ func (st styles) dueLabel(d, now time.Time) (string, lipgloss.Style) {
 func (m Model) viewFooter() string {
 	var l1, l2 string
 	switch m.mode {
-	case modeAdd, modeEdit, modeFilter:
-		label := map[mode]string{modeAdd: "add", modeEdit: "edit", modeFilter: "filter"}[m.mode]
+	case modeAdd, modeEdit, modeFilter, modeSaveName:
+		label := map[mode]string{modeAdd: "add", modeEdit: "edit", modeFilter: "filter", modeSaveName: "save search as"}[m.mode]
 		l1 = m.st.prompt.Render(" "+label+" › ") + m.input.View()
 		if len(m.sugg) > 0 {
 			var ss []string
@@ -314,7 +320,9 @@ func (m Model) viewFooter() string {
 			}
 			l2 = " " + strings.Join(ss, "") + m.st.faint.Render("   tab complete · ↑↓ choose")
 		} else if m.mode == modeFilter {
-			l2 = m.st.faint.Render(" type to filter · enter keep · esc clear")
+			l2 = m.st.faint.Render(" +proj @ctx due:+1w due:-3d due:overdue pri:A-C -word \"a phrase\" · enter keep · esc clear")
+		} else if m.mode == modeSaveName {
+			l2 = m.st.faint.Render(" saves " + m.currentQuery() + " to [filters] in " + m.opts.ConfigPath)
 		} else {
 			l2 = m.st.faint.Render(" enter save · esc cancel · tab completes +project @context due:")
 		}

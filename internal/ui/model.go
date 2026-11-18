@@ -95,6 +95,9 @@ type Model struct {
 
 	focus    focus
 	mode     mode
+	visual   bool                // visual (multi-select) mode
+	sel      map[*todo.Task]bool // tasks selected in visual mode
+	lineNums bool
 	sortIdx  int
 	hideDone bool
 	filter   string
@@ -142,6 +145,7 @@ func New(cfg config.Config, opts Options) (Model, error) {
 	}
 	errs := append(opts.Errors, m.applyConfig(cfg)...)
 	m.hideDone = cfg.View.HideCompleted
+	m.lineNums = cfg.View.LineNumbers
 	m.showConfigErrors(errs)
 	if err := m.load(); err != nil {
 		return m, err
@@ -202,6 +206,7 @@ func (m *Model) load() error {
 		return err
 	}
 	m.tasks, m.modTime = tasks, mt
+	m.endVisual()
 	m.refresh(nil)
 	return nil
 }
@@ -363,65 +368,6 @@ func (m *Model) buildSidebar() {
 	}
 }
 
-func (m *Model) sortVisible() {
-	order := make(map[*todo.Task]int, len(m.tasks))
-	for i, t := range m.tasks {
-		order[t] = i
-	}
-	mode := sortModes[m.sortIdx]
-	pri := func(t *todo.Task) int {
-		if t.Priority == 0 {
-			return 27
-		}
-		return int(t.Priority - 'A')
-	}
-	dueKey := func(t *todo.Task) (time.Time, bool) { return t.Due() }
-
-	sort.SliceStable(m.visible, func(i, j int) bool {
-		a, b := m.visible[i], m.visible[j]
-		if mode == "file" {
-			return order[a] < order[b]
-		}
-		if a.Done != b.Done {
-			return !a.Done
-		}
-		switch mode {
-		case "priority":
-			if pri(a) != pri(b) {
-				return pri(a) < pri(b)
-			}
-			da, oka := dueKey(a)
-			db, okb := dueKey(b)
-			if oka != okb {
-				return oka
-			}
-			if oka && !da.Equal(db) {
-				return da.Before(db)
-			}
-		case "due":
-			da, oka := dueKey(a)
-			db, okb := dueKey(b)
-			if oka != okb {
-				return oka
-			}
-			if oka && !da.Equal(db) {
-				return da.Before(db)
-			}
-			if pri(a) != pri(b) {
-				return pri(a) < pri(b)
-			}
-		case "created":
-			if !a.Created.Equal(b.Created) {
-				if a.Created.IsZero() || b.Created.IsZero() {
-					return !a.Created.IsZero()
-				}
-				return a.Created.After(b.Created)
-			}
-		}
-		return order[a] < order[b]
-	})
-}
-
 func (m *Model) listRows() int {
 	r := m.bodyHeight() - 2 // pane border
 	if r < 1 {
@@ -552,6 +498,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case chordTimeoutMsg:
 		return m, m.chordTimedOut(msg)
+	case clipMsg:
+		m.copied(msg)
+		return m, nil
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -615,6 +564,10 @@ func (m Model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, a.run(&m)
 		}
 		// Not a chord: handle the key on its own.
+	}
+	if m.visual && k == " " {
+		m.toggleSelected()
+		return m, nil
 	}
 	if m.km.prefixes[k] {
 		m.pending = k
@@ -727,114 +680,6 @@ func (m *Model) startInput(val string, cursor int) {
 	m.updateSuggestions()
 }
 
-func (m *Model) toggle() {
-	t := m.selected()
-	if t == nil {
-		return
-	}
-	now := time.Now()
-	if t.Done {
-		m.mutate(t.Uncomplete)
-		m.refresh(t)
-		return
-	}
-
-	// Recurring task: queue the next occurrence right after this one.
-	next, recurs := t.Next(now)
-	complete := func() {
-		t.Complete(now)
-		if recurs {
-			m.insertAfter(t, next)
-		}
-	}
-	msg := "completed — u to undo"
-	if recurs {
-		if d, ok := next.Due(); ok {
-			msg = "completed — next due " + d.Format(todo.DateLayout)
-		} else {
-			msg = "completed — next occurrence added"
-		}
-	}
-
-	if m.cfg.Tasks.AutoArchive {
-		if m.stale() {
-			m.setError("todo.txt changed on disk — press r to reload first")
-			return
-		}
-		complete()
-		m.archive([]*todo.Task{t})
-		if !m.statusErr && recurs {
-			m.setStatus("%s (archived)", msg)
-		}
-		if recurs {
-			m.refresh(next)
-		}
-		return
-	}
-	if m.mutate(complete) {
-		m.setStatus("%s", msg)
-	}
-	m.refresh(t)
-}
-
-// insertAfter puts n directly after t in file order.
-func (m *Model) insertAfter(t, n *todo.Task) {
-	for i, x := range m.tasks {
-		if x == t {
-			m.tasks = append(m.tasks[:i+1], append([]*todo.Task{n}, m.tasks[i+1:]...)...)
-			return
-		}
-	}
-	m.tasks = append(m.tasks, n)
-}
-
-func (m *Model) bumpPriority(up bool) {
-	t := m.selected()
-	if t == nil || t.Done {
-		return
-	}
-	p := t.Priority
-	switch {
-	case up && p == 0:
-		p = 'A'
-	case up && p > 'A':
-		p--
-	case !up && p == 'Z':
-		p = 0
-	case !up && p != 0:
-		p++
-	}
-	if p != t.Priority {
-		m.mutate(func() { t.Priority = p })
-		m.refresh(t)
-	}
-}
-
-func (m *Model) updatePriority(msg tea.KeyMsg) {
-	m.mode = modeNormal
-	t := m.selected()
-	if t == nil {
-		return
-	}
-	s := msg.String()
-	var p byte
-	switch {
-	case len(s) == 1 && strings.ToUpper(s)[0] >= 'A' && strings.ToUpper(s)[0] <= 'Z':
-		p = strings.ToUpper(s)[0]
-	case s == " " || s == "backspace" || s == "delete" || s == "0":
-		p = 0
-	default:
-		m.setStatus("cancelled")
-		return
-	}
-	if t.Done && p != 0 {
-		m.setError("completed tasks can't have a priority")
-		return
-	}
-	m.mutate(func() { t.Priority = p })
-	m.refresh(t)
-}
-
 func (m *Model) undoLast() {
 	if len(m.undo) == 0 {
 		m.setStatus("nothing to undo")
@@ -845,6 +690,7 @@ func (m *Model) undoLast() {
 		return
 	}
 	idx := m.cursor
+	m.endVisual()
 	m.tasks = m.undo[len(m.undo)-1]
 	m.undo = m.undo[:len(m.undo)-1]
 	if m.save() {

@@ -160,22 +160,53 @@ func (m Model) viewList(w, h int) string {
 	var lines []string
 	end := min(len(m.visible), m.offset+h)
 	now := time.Now()
+	var nums map[*todo.Task]int
+	numW := 0
+	if m.lineNums {
+		nums = make(map[*todo.Task]int, len(m.tasks))
+		for i, t := range m.tasks {
+			nums[t] = i + 1
+		}
+		numW = len(fmt.Sprint(len(m.tasks)))
+	}
+	hide := map[string]bool{}
+	for _, k := range m.cfg.View.HideKeys {
+		hide[k] = true
+	}
 	for i := m.offset; i < end; i++ {
-		lines = append(lines, m.renderTask(m.visible[i], i == m.cursor, m.focus == focusList, w, now))
+		t := m.visible[i]
+		r := row{cursor: i == m.cursor, focused: m.focus == focusList, marked: m.sel[t], num: nums[t], numW: numW, hide: hide}
+		lines = append(lines, m.renderTask(t, r, w, now))
 	}
 	return strings.Join(lines, "\n")
 }
 
-func (m Model) renderTask(t *todo.Task, selected, focused bool, w int, now time.Time) string {
+// row says how one task line is drawn.
+type row struct {
+	cursor, focused, marked bool
+	num, numW               int // task number and its column width; 0 = off
+	hide                    map[string]bool
+}
+
+func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 	on := func(s lipgloss.Style) lipgloss.Style {
-		if selected && focused {
+		switch {
+		case r.cursor && r.focused:
 			return s.Background(m.st.cursorBg)
+		case r.marked:
+			return s.Background(m.st.selectedBg)
 		}
 		return s
 	}
 	marker := on(m.st.prompt).Render(" ")
-	if selected {
+	switch {
+	case r.cursor:
 		marker = on(m.st.prompt).Render("▌")
+	case r.marked:
+		marker = on(m.st.prompt).Render("•")
+	}
+	if r.numW > 0 {
+		marker += on(m.st.faint).Render(fmt.Sprintf("%*d ", r.numW, r.num))
 	}
 
 	box := on(m.st.faint).Render("[ ] ")
@@ -218,6 +249,9 @@ func (m Model) renderTask(t *todo.Task, selected, focused bool, w int, now time.
 		case len(word) > 1 && word[0] == '@':
 			st = m.st.context
 		case isTag(word):
+			if k, _, _ := strings.Cut(word, ":"); r.hide[strings.ToLower(k)] {
+				continue
+			}
 			st = m.st.tag
 		}
 		parts = append(parts, on(st).Render(word))
@@ -300,6 +334,13 @@ func (m Model) viewFooter() string {
 			l1 = " " + m.st.err.Render("⚠ "+m.configWarn) + m.st.faint.Render("  (fix, then ctrl+r)")
 		}
 		l2 = " " + m.shortHelp()
+		if m.visual {
+			l2 = m.st.suggestOn.Render(fmt.Sprintf("VISUAL %d", len(m.sel))) + " " +
+				m.st.faint.Render("space mark · x done · d delete · p priority · yy copy · esc leave")
+		}
+		if m.pending != "" {
+			l2 = m.st.suggestOn.Render(displayKey(m.pending)+"…") + " " + l2
+		}
 	}
 	return ansi.Truncate(l1, m.width, "…") + "\n" + ansi.Truncate(l2, m.width, "…")
 }

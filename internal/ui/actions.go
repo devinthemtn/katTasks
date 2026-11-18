@@ -70,18 +70,8 @@ func defineActions() []*action {
 			}
 			return nil
 		}},
-		{name: "toggle_done", desc: "toggle done", group: groupEdit, defaults: []string{"x", "space"}, needsTask: true, run: func(m *Model) tea.Cmd { m.toggle(); return nil }},
-		{name: "delete", desc: "delete task", group: groupEdit, defaults: []string{"d"}, needsTask: true, run: func(m *Model) tea.Cmd {
-			if t := m.selected(); t != nil {
-				m.ask(fmt.Sprintf("Delete %q? (y/n)", truncate(t.Text, 50)), func(m *Model) {
-					if m.mutate(func() { m.removeTasks(map[*todo.Task]bool{t: true}) }) {
-						m.setStatus("deleted — u to undo")
-					}
-					m.refresh(nil)
-				})
-			}
-			return nil
-		}},
+		{name: "toggle_done", desc: "toggle done", group: groupEdit, defaults: []string{"x", "space"}, needsTask: true, run: func(m *Model) tea.Cmd { m.toggleTargets(); return nil }},
+		{name: "delete", desc: "delete task", group: groupEdit, defaults: []string{"d"}, needsTask: true, run: func(m *Model) tea.Cmd { m.deleteTargets(); return nil }},
 		{name: "set_priority", desc: "set priority (then A–Z)", group: groupEdit, defaults: []string{"p"}, needsTask: true, run: func(m *Model) tea.Cmd {
 			if m.selected() != nil {
 				m.mode = modePriority
@@ -90,6 +80,12 @@ func defineActions() []*action {
 		}},
 		{name: "priority_up", desc: "raise priority", group: groupEdit, defaults: []string{"+", "="}, needsTask: true, run: func(m *Model) tea.Cmd { m.bumpPriority(true); return nil }},
 		{name: "priority_down", desc: "lower priority", group: groupEdit, defaults: []string{"-"}, needsTask: true, run: func(m *Model) tea.Cmd { m.bumpPriority(false); return nil }},
+		{name: "move_down", desc: "move task down", group: groupEdit, defaults: []string{"J"}, needsTask: true, run: func(m *Model) tea.Cmd { m.moveTask(1); return nil }},
+		{name: "move_up", desc: "move task up", group: groupEdit, defaults: []string{"K"}, needsTask: true, run: func(m *Model) tea.Cmd { m.moveTask(-1); return nil }},
+		{name: "visual", desc: "select several (space marks)", group: groupEdit, defaults: []string{"v"}, run: func(m *Model) tea.Cmd { m.toggleVisual(); return nil }},
+		{name: "select_all", desc: "select all shown", group: groupEdit, defaults: []string{"V"}, run: func(m *Model) tea.Cmd { m.selectAll(); return nil }},
+		{name: "copy_line", desc: "copy line", group: groupEdit, defaults: []string{"yy"}, needsTask: true, run: func(m *Model) tea.Cmd { return m.copyTargets(false) }},
+		{name: "copy_body", desc: "copy text only", group: groupEdit, defaults: []string{"yb"}, needsTask: true, run: func(m *Model) tea.Cmd { return m.copyTargets(true) }},
 		{name: "undo", desc: "undo", group: groupEdit, defaults: []string{"u"}, run: func(m *Model) tea.Cmd { m.undoLast(); return nil }},
 		{name: "archive_done", desc: "archive done to done.txt", group: groupEdit, defaults: []string{"A"}, run: func(m *Model) tea.Cmd { m.askArchive(); return nil }},
 
@@ -98,8 +94,10 @@ func defineActions() []*action {
 			m.startInput(m.filter, -1)
 			return nil
 		}},
-		{name: "clear_filter", desc: "clear filter", group: groupView, defaults: []string{"esc"}, run: func(m *Model) tea.Cmd {
-			if m.filter != "" {
+		{name: "clear_filter", desc: "clear filter / selection", group: groupView, defaults: []string{"esc"}, run: func(m *Model) tea.Cmd {
+			if m.visual {
+				m.endVisual()
+			} else if m.filter != "" {
 				m.filter = ""
 				m.refresh(nil)
 			} else if m.sideCursor != 0 {
@@ -124,6 +122,7 @@ func defineActions() []*action {
 			}
 			return nil
 		}},
+		{name: "toggle_line_numbers", desc: "line numbers", group: groupView, defaults: []string{"L"}, run: func(m *Model) tea.Cmd { m.lineNums = !m.lineNums; return nil }},
 		{name: "theme_picker", desc: "pick theme", group: groupView, defaults: []string{"T"}, run: func(m *Model) tea.Cmd { m.openThemePicker(); return nil }},
 		{name: "cycle_theme", desc: "next theme", group: groupView, run: func(m *Model) tea.Cmd { m.cycleTheme(); return nil }},
 		{name: "reload", desc: "reload todo.txt", group: groupView, defaults: []string{"r"}, run: func(m *Model) tea.Cmd {

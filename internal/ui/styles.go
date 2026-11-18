@@ -27,6 +27,7 @@ var (
 	sError     = lipgloss.NewStyle().Foreground(cRed).Bold(true)
 	sOK        = lipgloss.NewStyle().Foreground(cProject)
 	sPrompt    = lipgloss.NewStyle().Foreground(cAccent).Bold(true)
+	sHelpKey   = lipgloss.NewStyle().Foreground(cText).Bold(true)
 	sSuggest   = lipgloss.NewStyle().Foreground(cMuted)
 	sSuggestOn = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Background(cAccent).Padding(0, 1)
 

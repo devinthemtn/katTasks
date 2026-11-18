@@ -85,10 +85,8 @@ func (m Model) viewBody() string {
 
 	var main string
 	if m.showHelp {
-		m.help.ShowAll = true
-		m.help.Width = lw - 4
 		main = lipgloss.NewStyle().Padding(0, 1).Render(
-			sHeader.Render("KEYS") + "\n\n" + m.help.View(m.keys) + "\n\n" + m.inputHelp() +
+			sHeader.Render("KEYS") + "\n\n" + m.fullHelp(lw-4) + "\n\n" + m.inputHelp() +
 				"\n\n" + sFaint.Render("press any key to close"))
 	} else {
 		main = m.viewList(lw-2, inner)
@@ -297,8 +295,7 @@ func (m Model) viewFooter() string {
 		} else if m.configWarn != "" {
 			l1 = " " + sError.Render("⚠ "+m.configWarn) + sFaint.Render("  (fix, then ctrl+r)")
 		}
-		m.help.ShowAll = false
-		l2 = " " + m.help.View(m.keys)
+		l2 = " " + m.shortHelp()
 	}
 	return ansi.Truncate(l1, m.width, "…") + "\n" + ansi.Truncate(l2, m.width, "…")
 }
@@ -309,4 +306,71 @@ func clipLines(s string, n int) string {
 		lines = lines[:n]
 	}
 	return strings.Join(lines, "\n")
+}
+
+// shortHelp is the one-line key summary in the footer.
+func (m Model) shortHelp() string {
+	var parts []string
+	for _, name := range shortHelpActions {
+		ks := m.km.keysFor(name)
+		if len(ks) == 0 {
+			continue
+		}
+		parts = append(parts, sHelpKey.Render(ks[0])+" "+sFaint.Render(shortLabel(name)))
+	}
+	return strings.Join(parts, sFaint.Render(" • "))
+}
+
+// fullHelp lists every bound action, one column per group.
+func (m Model) fullHelp(w int) string {
+	var cols []string
+	for _, g := range []string{groupMove, groupEdit, groupView} {
+		type row struct{ k, d string }
+		var rows []row
+		kw := 0
+		for _, a := range actions {
+			if a.group != g {
+				continue
+			}
+			ks := m.km.keysFor(a.name)
+			if len(ks) == 0 {
+				continue
+			}
+			k := strings.Join(ks, " ")
+			kw = max(kw, lipgloss.Width(k))
+			rows = append(rows, row{k, a.desc})
+		}
+		lines := []string{sHeader.Render(g)}
+		for _, r := range rows {
+			lines = append(lines, sHelpKey.Render(r.k)+strings.Repeat(" ", kw-lipgloss.Width(r.k)+2)+sFaint.Render(r.d))
+		}
+		cols = append(cols, strings.Join(lines, "\n"))
+	}
+	gap := "   "
+	if j := lipgloss.JoinHorizontal(lipgloss.Top, cols[0], gap, cols[1], gap, cols[2]); lipgloss.Width(j) <= w {
+		return j
+	}
+	if j := lipgloss.JoinHorizontal(lipgloss.Top, cols[0], gap, cols[1]); lipgloss.Width(j) <= w {
+		return j + "\n\n" + cols[2]
+	}
+	return strings.Join(cols, "\n\n")
+}
+
+// shortLabel is an action's footer label.
+func shortLabel(name string) string {
+	switch name {
+	case "add", "edit", "filter", "help", "quit":
+		return name
+	case "toggle_done":
+		return "done"
+	case "set_priority":
+		return "priority"
+	case "cycle_sort":
+		return "sort"
+	case "switch_pane":
+		return "pane"
+	case "palette":
+		return "commands"
+	}
+	return actionByName[name].desc
 }

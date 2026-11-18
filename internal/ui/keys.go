@@ -1,57 +1,151 @@
 package ui
 
-import "github.com/charmbracelet/bubbles/key"
+import (
+	"fmt"
+	"sort"
+	"strings"
+	"unicode/utf8"
+)
 
-type keyMap struct {
-	Up, Down, Top, Bottom, HalfUp, HalfDown key.Binding
-	SwitchPane, Left, Right                 key.Binding
-	Add, Edit, Toggle, Delete               key.Binding
-	Priority, PriUp, PriDown                key.Binding
-	Filter, ClearFilter, Sort, HideDone     key.Binding
-	Archive, Undo, Reload, Help, Quit       key.Binding
+// chordTimeout is how long the first key of a chord waits for the second.
+const chordTimeoutMS = 600
+
+// keymap resolves pressed keys to actions.
+type keymap struct {
+	single   map[string]*action
+	chords   map[string]*action // two-key sequences such as "yy"
+	prefixes map[string]bool    // first keys of chords
+	keys     map[string][]string
 }
 
-func newKeyMap() keyMap {
-	b := func(keys []string, help, desc string) key.Binding {
-		return key.NewBinding(key.WithKeys(keys...), key.WithHelp(help, desc))
-	}
-	return keyMap{
-		Up:          b([]string{"k", "up"}, "k/↑", "up"),
-		Down:        b([]string{"j", "down"}, "j/↓", "down"),
-		Top:         b([]string{"g", "home"}, "g", "top"),
-		Bottom:      b([]string{"G", "end"}, "G", "bottom"),
-		HalfUp:      b([]string{"ctrl+u", "pgup"}, "ctrl+u", "page up"),
-		HalfDown:    b([]string{"ctrl+d", "pgdown"}, "ctrl+d", "page down"),
-		SwitchPane:  b([]string{"tab", "shift+tab"}, "tab", "switch pane"),
-		Left:        b([]string{"h", "left"}, "h", "sidebar"),
-		Right:       b([]string{"l", "right"}, "l", "tasks"),
-		Add:         b([]string{"a", "n"}, "a", "add"),
-		Edit:        b([]string{"e", "enter"}, "e", "edit"),
-		Toggle:      b([]string{"x", " "}, "x", "toggle done"),
-		Delete:      b([]string{"d"}, "d", "delete"),
-		Priority:    b([]string{"p"}, "p", "set priority"),
-		PriUp:       b([]string{"+", "="}, "+/-", "raise/lower priority"),
-		PriDown:     b([]string{"-"}, "-", "lower priority"),
-		Filter:      b([]string{"/"}, "/", "filter"),
-		ClearFilter: b([]string{"esc"}, "esc", "clear filter"),
-		Sort:        b([]string{"s"}, "s", "cycle sort"),
-		HideDone:    b([]string{"H"}, "H", "hide/show done"),
-		Archive:     b([]string{"A"}, "A", "archive done"),
-		Undo:        b([]string{"u"}, "u", "undo"),
-		Reload:      b([]string{"r"}, "r", "reload file"),
-		Help:        b([]string{"?"}, "?", "help"),
-		Quit:        b([]string{"q", "ctrl+c"}, "q", "quit"),
+var namedKeys = map[string]string{
+	"enter": "enter", "return": "enter", "esc": "esc", "escape": "esc", "tab": "tab",
+	"space": " ", "backspace": "backspace", "delete": "delete", "del": "delete", "insert": "insert",
+	"up": "up", "down": "down", "left": "left", "right": "right", "home": "home", "end": "end",
+	"pgup": "pgup", "pageup": "pgup", "page-up": "pgup", "pgdown": "pgdown", "pagedown": "pgdown", "page-down": "pgdown",
+}
+
+func init() {
+	for i := 1; i <= 20; i++ {
+		f := fmt.Sprintf("f%d", i)
+		namedKeys[f] = f
 	}
 }
 
-func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Add, k.Edit, k.Toggle, k.Priority, k.Filter, k.Sort, k.SwitchPane, k.Help, k.Quit}
+// parseKey normalizes a key name from the config to the form Bubble Tea's
+// KeyMsg.String() produces. chord reports a two-key sequence.
+func parseKey(s string) (k string, chord bool, err error) {
+	if s == "" {
+		return "", false, fmt.Errorf("empty key")
+	}
+	if utf8.RuneCountInString(s) == 1 {
+		return s, false, nil
+	}
+	if n, ok := namedKeys[strings.ToLower(s)]; ok {
+		return n, false, nil
+	}
+	if i := strings.LastIndex(s, "+"); i > 0 && i < len(s)-1 {
+		mods := strings.Split(strings.ToLower(s[:i]), "+")
+		for _, mod := range mods {
+			if mod != "ctrl" && mod != "alt" && mod != "shift" {
+				return "", false, fmt.Errorf("unknown modifier %q", mod)
+			}
+		}
+		last := s[i+1:]
+		if n, ok := namedKeys[strings.ToLower(last)]; ok {
+			last = n
+			if last == " " {
+				last = "space"
+			}
+		} else if utf8.RuneCountInString(last) != 1 {
+			return "", false, fmt.Errorf("unknown key %q", last)
+		} else if mods[0] == "ctrl" {
+			last = strings.ToLower(last)
+		}
+		return strings.Join(mods, "+") + "+" + last, false, nil
+	}
+	if utf8.RuneCountInString(s) == 2 {
+		return s, true, nil
+	}
+	return "", false, fmt.Errorf("unknown key %q", s)
 }
 
-func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.Up, k.Down, k.Top, k.Bottom, k.HalfUp, k.HalfDown, k.SwitchPane},
-		{k.Add, k.Edit, k.Toggle, k.Delete, k.Priority, k.PriUp, k.Undo},
-		{k.Filter, k.ClearFilter, k.Sort, k.HideDone, k.Archive, k.Reload, k.Quit},
+// displayKey is how a key is shown in help.
+func displayKey(k string) string {
+	if k == " " {
+		return "space"
 	}
+	return k
+}
+
+// buildKeymap combines each action's defaults with the [keys] overrides. An
+// overridden action uses exactly the keys given ([] unbinds it); a key given
+// to one action is removed from every other action's defaults. An override
+// whose keys are all invalid is reported and the defaults are kept.
+func buildKeymap(overrides map[string][]string) (keymap, []error) {
+	var errs []error
+	want := map[string][]string{}
+	taken := map[string]bool{}
+
+	names := make([]string, 0, len(overrides))
+	for n := range overrides {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if _, ok := actionByName[name]; !ok {
+			errs = append(errs, fmt.Errorf("keys.%s: unknown action (press : to list them)", name))
+			continue
+		}
+		var ks []string
+		for _, raw := range overrides[name] {
+			k, _, err := parseKey(raw)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("keys.%s: %v", name, err))
+				continue
+			}
+			ks = append(ks, k)
+		}
+		if len(ks) == 0 && len(overrides[name]) > 0 {
+			continue // all invalid: keep the defaults rather than lose the action
+		}
+		want[name] = ks
+		for _, k := range ks {
+			taken[k] = true
+		}
+	}
+	for _, a := range actions {
+		if _, ok := want[a.name]; ok {
+			continue
+		}
+		for _, raw := range a.defaults {
+			k, _, _ := parseKey(raw)
+			if !taken[k] {
+				want[a.name] = append(want[a.name], k)
+			}
+		}
+	}
+
+	km := keymap{single: map[string]*action{}, chords: map[string]*action{}, prefixes: map[string]bool{}, keys: want}
+	for _, a := range actions {
+		for _, k := range want[a.name] {
+			if utf8.RuneCountInString(k) == 2 && !strings.Contains(k, "+") && namedKeys[k] == "" {
+				km.chords[k] = a
+				r, _ := utf8.DecodeRuneInString(k)
+				km.prefixes[string(r)] = true
+			} else {
+				km.single[k] = a
+			}
+		}
+	}
+	return km, errs
+}
+
+// keysFor returns the display form of an action's keys.
+func (km keymap) keysFor(name string) []string {
+	var out []string
+	for _, k := range km.keys[name] {
+		out = append(out, displayKey(k))
+	}
+	return out
 }

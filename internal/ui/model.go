@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -110,8 +108,9 @@ type Model struct {
 	statusErr  bool
 	configWarn string // settings problems, shown until fixed and reloaded
 
-	keys     keyMap
-	help     help.Model
+	km       keymap
+	pending  string // first key of a chord, waiting for the second
+	chordSeq int
 	showHelp bool
 
 	width, height int
@@ -133,20 +132,19 @@ func New(cfg config.Config, opts Options) (Model, error) {
 	m := Model{
 		opts:  opts,
 		input: ti,
-		keys:  newKeyMap(),
-		help:  help.New(),
 	}
-	m.applyConfig(cfg)
+	errs := append(opts.Errors, m.applyConfig(cfg)...)
 	m.hideDone = cfg.View.HideCompleted
-	m.showConfigErrors(opts.Errors)
+	m.showConfigErrors(errs)
 	if err := m.load(); err != nil {
 		return m, err
 	}
 	return m, nil
 }
 
-// applyConfig installs settings, from startup or a Ctrl-r reload.
-func (m *Model) applyConfig(cfg config.Config) {
+// applyConfig installs settings, from startup or a Ctrl-r reload, and
+// returns problems with the key bindings.
+func (m *Model) applyConfig(cfg config.Config) []error {
 	if m.opts.TodoFile != "" {
 		cfg.SetTodo(m.opts.TodoFile)
 	}
@@ -156,6 +154,9 @@ func (m *Model) applyConfig(cfg config.Config) {
 			m.sortIdx = i
 		}
 	}
+	km, errs := buildKeymap(cfg.Keys)
+	m.km = km
+	return errs
 }
 
 func (m *Model) showConfigErrors(errs []error) {
@@ -185,7 +186,7 @@ func (m *Model) load() error {
 func (m *Model) reloadConfig() {
 	cfg, _, errs := config.Load(m.opts.ConfigPath)
 	oldTodo := m.cfg.Files.Todo
-	m.applyConfig(cfg)
+	errs = append(errs, m.applyConfig(cfg)...)
 	if m.cfg.Files.Todo != oldTodo {
 		m.undo = nil
 		if err := m.load(); err != nil {
@@ -521,10 +522,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.help.Width = msg.Width
 		m.input.Width = msg.Width - 12
 		m.clampCursor()
 		return m, nil
+	case chordTimeoutMsg:
+		return m, m.chordTimedOut(msg)
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -562,135 +564,83 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// chordTimeoutMsg ends the wait for a chord's second key.
+type chordTimeoutMsg struct{ seq int }
+
 func (m Model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	k := m.keys
 	m.status = ""
+	k := msg.String()
 
 	if m.showHelp {
-		if key.Matches(msg, k.Quit) {
+		m.showHelp = false
+		if a := m.km.single[k]; a != nil && a.name == "quit" {
 			return m, tea.Quit
 		}
-		m.showHelp = false
 		return m, nil
 	}
 
-	switch {
-	case key.Matches(msg, k.Quit):
-		return m, tea.Quit
-	case key.Matches(msg, k.Help):
-		m.showHelp = true
-	case key.Matches(msg, k.SwitchPane):
-		if m.focus == focusList {
-			m.focus = focusSidebar
-		} else {
-			m.focus = focusList
+	if m.pending != "" {
+		combo := m.pending + k
+		m.pending = ""
+		if a := m.km.chords[combo]; a != nil {
+			return m, a.run(&m)
 		}
-	case key.Matches(msg, k.Left):
-		m.focus = focusSidebar
-	case key.Matches(msg, k.Right):
-		m.focus = focusList
-
-	case key.Matches(msg, k.Up), key.Matches(msg, k.Down), key.Matches(msg, k.Top),
-		key.Matches(msg, k.Bottom), key.Matches(msg, k.HalfUp), key.Matches(msg, k.HalfDown):
-		m.move(msg)
-
-	case m.focus == focusSidebar && msg.String() == "enter":
-		m.focus = focusList
-
-	case key.Matches(msg, k.Add):
-		m.startAdd()
-	case key.Matches(msg, k.Edit):
-		if t := m.selected(); t != nil {
-			m.mode, m.editing = modeEdit, t
-			m.startInput(t.String(), -1)
-		}
-	case key.Matches(msg, k.Toggle):
-		m.toggle()
-	case key.Matches(msg, k.Delete):
-		if t := m.selected(); t != nil {
-			m.ask(fmt.Sprintf("Delete %q? (y/n)", truncate(t.Text, 50)), func(m *Model) {
-				if m.mutate(func() { m.removeTasks(map[*todo.Task]bool{t: true}) }) {
-					m.setStatus("deleted — u to undo")
-				}
-				m.refresh(nil)
-			})
-		}
-	case key.Matches(msg, k.Priority):
-		if m.selected() != nil {
-			m.mode = modePriority
-		}
-	case key.Matches(msg, k.PriUp), key.Matches(msg, k.PriDown):
-		m.bumpPriority(key.Matches(msg, k.PriUp))
-
-	case key.Matches(msg, k.Filter):
-		m.mode = modeFilter
-		m.startInput(m.filter, -1)
-	case key.Matches(msg, k.ClearFilter):
-		if m.filter != "" {
-			m.filter = ""
-			m.refresh(nil)
-		} else if m.sideCursor != 0 {
-			m.sideCursor = 0
-			m.refresh(nil)
-		}
-	case key.Matches(msg, k.Sort):
-		m.sortIdx = (m.sortIdx + 1) % len(sortModes)
-		m.refresh(nil)
-		m.setStatus("sorted by %s", sortModes[m.sortIdx])
-	case key.Matches(msg, k.HideDone):
-		m.hideDone = !m.hideDone
-		m.refresh(nil)
-		if m.hideDone {
-			m.setStatus("hiding completed tasks")
-		} else {
-			m.setStatus("showing completed tasks")
-		}
-	case key.Matches(msg, k.Archive):
-		var done []*todo.Task
-		for _, t := range m.tasks {
-			if t.Done {
-				done = append(done, t)
-			}
-		}
-		if len(done) == 0 {
-			m.setStatus("no completed tasks to archive")
-			break
-		}
-		m.ask(fmt.Sprintf("Move %d completed task(s) to %s? This can't be undone. (y/n)", len(done), m.cfg.Files.Done),
-			func(m *Model) { m.archive(done) })
-	case key.Matches(msg, k.Undo):
-		m.undoLast()
-	case msg.String() == "ctrl+r":
-		m.reloadConfig()
-	case key.Matches(msg, k.Reload):
-		if err := m.load(); err != nil {
-			m.setError("reload failed: %v", err)
-		} else {
-			m.undo = nil
-			m.setStatus("reloaded %s (%d tasks)", m.cfg.Files.Todo, len(m.tasks))
-		}
+		// Not a chord: handle the key on its own.
+	}
+	if m.km.prefixes[k] {
+		m.pending = k
+		m.chordSeq++
+		seq := m.chordSeq
+		return m, tea.Tick(chordTimeoutMS*time.Millisecond, func(time.Time) tea.Msg { return chordTimeoutMsg{seq} })
+	}
+	if a := m.km.single[k]; a != nil {
+		return m, a.run(&m)
 	}
 	return m, nil
 }
 
-func (m *Model) move(msg tea.KeyMsg) {
-	k := m.keys
+// chordTimedOut runs the single-key action, if any, of a chord prefix that
+// was not followed by a second key in time.
+func (m *Model) chordTimedOut(msg chordTimeoutMsg) tea.Cmd {
+	if msg.seq != m.chordSeq || m.pending == "" {
+		return nil
+	}
+	k := m.pending
+	m.pending = ""
+	if a := m.km.single[k]; a != nil {
+		return a.run(m)
+	}
+	return nil
+}
+
+type moveKind int
+
+const (
+	moveDown moveKind = iota
+	moveUp
+	moveTop
+	moveBottom
+	moveHalfDown
+	moveHalfUp
+)
+
+func (m *Model) move(how moveKind) {
 	half := m.listRows() / 2
 	if m.focus == focusSidebar {
 		c := m.sideCursor
 		dir := 1
-		switch {
-		case key.Matches(msg, k.Up):
+		switch how {
+		case moveUp:
 			c, dir = c-1, -1
-		case key.Matches(msg, k.Down):
+		case moveDown:
 			c++
-		case key.Matches(msg, k.Top):
+		case moveTop:
 			c = 0
-		case key.Matches(msg, k.Bottom):
+		case moveBottom:
 			c, dir = len(m.side)-1, -1
-		case key.Matches(msg, k.HalfUp):
+		case moveHalfUp:
 			c, dir = c-half, -1
-		case key.Matches(msg, k.HalfDown):
+		case moveHalfDown:
 			c += half
 		}
 		c = clamp(c, 0, len(m.side)-1)
@@ -706,18 +656,18 @@ func (m *Model) move(msg tea.KeyMsg) {
 		m.clampCursor()
 		return
 	}
-	switch {
-	case key.Matches(msg, k.Up):
+	switch how {
+	case moveUp:
 		m.cursor--
-	case key.Matches(msg, k.Down):
+	case moveDown:
 		m.cursor++
-	case key.Matches(msg, k.Top):
+	case moveTop:
 		m.cursor = 0
-	case key.Matches(msg, k.Bottom):
+	case moveBottom:
 		m.cursor = len(m.visible) - 1
-	case key.Matches(msg, k.HalfUp):
+	case moveHalfUp:
 		m.cursor -= half
-	case key.Matches(msg, k.HalfDown):
+	case moveHalfDown:
 		m.cursor += half
 	}
 	m.clampCursor()

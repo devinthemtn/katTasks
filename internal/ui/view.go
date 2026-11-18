@@ -84,7 +84,9 @@ func (m Model) viewBody() string {
 	side := sideStyle.Width(sw - 2).Height(inner).Render(m.viewSidebar(sw-2, inner))
 
 	var main string
-	if m.mode == modeTheme {
+	if m.mode == modePalette {
+		main = lipgloss.NewStyle().Padding(0, 1).Render(m.viewPalette(lw-4, inner))
+	} else if m.mode == modeTheme {
 		main = lipgloss.NewStyle().Padding(0, 1).Render(m.viewThemePicker())
 	} else if m.showHelp {
 		main = lipgloss.NewStyle().Padding(0, 1).Render(
@@ -323,6 +325,8 @@ func (m Model) viewFooter() string {
 		l1 = m.st.prompt.Render(" priority › ") + m.st.faint.Render("press A–Z, space to clear, esc to cancel")
 	case modeTheme:
 		l1 = m.st.prompt.Render(" theme › ") + m.st.text.Render(m.theme)
+	case modePalette:
+		l1 = m.st.faint.Render(" type to search commands · ↑↓ choose · enter run · esc close")
 	default:
 		if m.status != "" {
 			st := m.st.ok
@@ -419,3 +423,7 @@ func shortLabel(name string) string {
 	}
 	return actionByName[name].desc
 }
+
+func widthOf(s string) int { return lipgloss.Width(s) }
+
+func truncateANSI(s string, n int) string { return ansi.Truncate(s, max(n, 0), "…") }

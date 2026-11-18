@@ -32,6 +32,7 @@ const (
 	modePriority
 	modeConfirm
 	modeTheme
+	modePalette
 )
 
 var sortModes = config.SortModes
@@ -118,6 +119,9 @@ type Model struct {
 	theme    string // name of the theme in use
 	pickIdx  int    // theme picker cursor
 	pickPrev string // theme to restore if the picker is cancelled
+	palItems []paletteItem
+	palShown []int // indexes into palItems that match the query, best first
+	palIdx   int
 	km       keymap
 	pending  string // first key of a chord, waiting for the second
 	chordSeq int
@@ -505,7 +509,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
-		typing := m.mode == modeAdd || m.mode == modeEdit || m.mode == modeFilter
+		typing := m.mode == modeAdd || m.mode == modeEdit || m.mode == modeFilter || m.mode == modePalette
 		// Keys typed quickly can arrive as one multi-rune message; outside
 		// text entry handle them one at a time, so e.g. "pB" sets priority B.
 		if !typing && msg.Type == tea.KeyRunes && len(msg.Runes) > 1 && !msg.Paste {
@@ -521,6 +525,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.mode {
 		case modeAdd, modeEdit, modeFilter:
 			return m.updateInput(msg)
+		case modePalette:
+			return m.updatePalette(msg)
 		case modePriority:
 			m.updatePriority(msg)
 			return m, nil

@@ -103,6 +103,7 @@ func (m Model) inputHelp() string {
 		"↑/↓        choose suggestion",
 		"enter      save        esc  cancel",
 		"due:       today, tomorrow, mon..sun, +3d, +2w, +1m",
+		"rec:       1d 2w 1m 1y 5b (b = business days); rec:+1w = from due date",
 	}, "\n"))
 }
 
@@ -188,20 +189,27 @@ func renderTask(t *todo.Task, selected, focused bool, w int, now time.Time) stri
 	}
 
 	badge := ""
+	if _, ok := t.Recurrence(); ok && !t.Done {
+		badge = on(sContext).Render(" ↻")
+	}
 	if d, ok := t.Due(); ok {
 		label, st := dueLabel(d, now)
 		if t.Done {
 			st = sFaint
 		}
-		badge = on(st).Render(" " + label + " ")
+		badge += on(st).Render(" " + label + " ")
+	} else if badge != "" {
+		badge += on(sText).Render(" ")
 	}
+
+	_, hasDue := t.Due()
 
 	// Description, coloring tokens. The due: tag is shown as the badge instead.
 	var parts []string
 	for _, word := range strings.Fields(t.Text) {
 		st := sText
 		switch {
-		case strings.HasPrefix(word, "due:") && badge != "":
+		case strings.HasPrefix(word, "due:") && hasDue:
 			continue
 		case t.Done:
 			st = sDone

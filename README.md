@@ -42,6 +42,22 @@ While typing, `tab` completes `+project`, `@context` and `due:` words.
 Relative due dates are converted to `YYYY-MM-DD` on save: `due:today`,
 `due:tomorrow`, `due:fri`, `due:+3d`, `due:+2w`, `due:+1m`.
 
+### Recurring tasks
+
+Add a `rec:` tag and completing the task queues the next occurrence right
+after it (marked `↻` in the list):
+
+| tag        | next occurrence                                   |
+|------------|---------------------------------------------------|
+| `rec:1w`   | 1 week after the day you complete it              |
+| `rec:+1w`  | 1 week after the current due date (strict)        |
+| `rec:3d`   | units: `d` days, `b` business days, `w` weeks,    |
+| `rec:2m`   | `m` months, `y` years                             |
+
+If the task has no due date, one is added. A `t:` threshold date moves
+along with the due date, keeping the same gap. Month steps clamp to the end
+of the month (Jan 31 + 1m = Feb 28).
+
 Completing a task drops its priority (todo.sh convention) but keeps it as
 `pri:X` so un-completing restores it.
 

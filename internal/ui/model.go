@@ -699,27 +699,60 @@ func (m *Model) toggle() {
 	if t == nil {
 		return
 	}
-	if !t.Done && m.cfg.AutoArchive {
+	now := time.Now()
+	if t.Done {
+		m.mutate(t.Uncomplete)
+		m.refresh(t)
+		return
+	}
+
+	// Recurring task: queue the next occurrence right after this one.
+	next, recurs := t.Next(now)
+	complete := func() {
+		t.Complete(now)
+		if recurs {
+			m.insertAfter(t, next)
+		}
+	}
+	msg := "completed — u to undo"
+	if recurs {
+		if d, ok := next.Due(); ok {
+			msg = "completed — next due " + d.Format(todo.DateLayout)
+		} else {
+			msg = "completed — next occurrence added"
+		}
+	}
+
+	if m.cfg.AutoArchive {
 		if m.stale() {
 			m.setError("todo.txt changed on disk — press r to reload first")
 			return
 		}
-		t.Complete(time.Now())
+		complete()
 		m.archive([]*todo.Task{t})
+		if !m.statusErr && recurs {
+			m.setStatus("%s (archived)", msg)
+		}
+		if recurs {
+			m.refresh(next)
+		}
 		return
 	}
-	if m.mutate(func() {
-		if t.Done {
-			t.Uncomplete()
-		} else {
-			t.Complete(time.Now())
-		}
-	}) {
-		if t.Done {
-			m.setStatus("completed — u to undo")
-		}
+	if m.mutate(complete) {
+		m.setStatus("%s", msg)
 	}
 	m.refresh(t)
+}
+
+// insertAfter puts n directly after t in file order.
+func (m *Model) insertAfter(t, n *todo.Task) {
+	for i, x := range m.tasks {
+		if x == t {
+			m.tasks = append(m.tasks[:i+1], append([]*todo.Task{n}, m.tasks[i+1:]...)...)
+			return
+		}
+	}
+	m.tasks = append(m.tasks, n)
 }
 
 func (m *Model) bumpPriority(up bool) {
@@ -878,7 +911,10 @@ func (m *Model) submitInput() {
 	}
 }
 
-var dueWords = []string{"due:today", "due:tomorrow", "due:mon", "due:tue", "due:wed", "due:thu", "due:fri", "due:sat", "due:sun", "due:+1w", "due:+1m"}
+var keywordWords = []string{
+	"due:today", "due:tomorrow", "due:mon", "due:tue", "due:wed", "due:thu", "due:fri", "due:sat", "due:sun", "due:+1w", "due:+1m",
+	"rec:1d", "rec:1b", "rec:1w", "rec:2w", "rec:1m", "rec:1y", "rec:+1w", "rec:+1m", "rec:+1y",
+}
 
 // wordAtCursor returns the start index (in runes) and text of the word that
 // ends at the cursor.
@@ -907,11 +943,12 @@ func (m *Model) updateSuggestions() {
 	switch {
 	case w[0] == '+' || w[0] == '@':
 		pool = m.known
-	case strings.HasPrefix("due:", lw) && len(lw) >= 2 || strings.HasPrefix(lw, "due:"):
+	case len(lw) >= 3 && (strings.HasPrefix("due:", lw) || strings.HasPrefix(lw, "due:") ||
+		strings.HasPrefix("rec:", lw) || strings.HasPrefix(lw, "rec:")):
 		if m.mode == modeFilter {
 			return
 		}
-		pool = dueWords
+		pool = keywordWords
 	default:
 		return
 	}

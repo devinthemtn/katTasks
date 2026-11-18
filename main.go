@@ -8,8 +8,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"katTasks/internal/config"
-	"katTasks/internal/ui"
+	"github.com/devinthemtn/katTasks/internal/config"
+	"github.com/devinthemtn/katTasks/internal/ui"
 )
 
 func main() {

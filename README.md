@@ -3,7 +3,16 @@
 A terminal UI for [todo.txt](https://github.com/todotxt/todo.txt) files, built with
 [Bubble Tea](https://github.com/charmbracelet/bubbletea), Bubbles and Lip Gloss.
 
-## Build
+## Install
+
+Requires Go 1.24 or newer.
+
+    go install github.com/devinthemtn/katTasks@latest
+
+This puts `katTasks` in `$(go env GOPATH)/bin` (usually `~/go/bin`); make sure
+that's on your `PATH`.
+
+Or build from a checkout:
 
     go build -o katTasks .
 

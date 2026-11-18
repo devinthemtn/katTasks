@@ -12,8 +12,8 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 
-	"katTasks/internal/config"
-	"katTasks/internal/todo"
+	"github.com/devinthemtn/katTasks/internal/config"
+	"github.com/devinthemtn/katTasks/internal/todo"
 )
 
 type focus int

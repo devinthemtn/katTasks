@@ -1,4 +1,4 @@
-module katTasks
+module github.com/devinthemtn/katTasks
 
 go 1.24.2
 

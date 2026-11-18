@@ -10,7 +10,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
-	"katTasks/internal/todo"
+	"github.com/devinthemtn/katTasks/internal/todo"
 )
 
 const (

@@ -140,3 +140,13 @@ func TestLoadCreates(t *testing.T) {
 		t.Errorf("theme = %q after Save", c.Theme)
 	}
 }
+
+func TestDefaultHidesCompleted(t *testing.T) {
+	if !Defaults().View.HideCompleted {
+		t.Error("completed tasks should be hidden by default")
+	}
+	c, errs := Parse("[view]\nsort = \"due\"\n")
+	if len(errs) != 0 || !c.View.HideCompleted {
+		t.Errorf("a config without hide_completed should hide them: %v", errs)
+	}
+}

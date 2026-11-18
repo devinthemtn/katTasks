@@ -24,7 +24,7 @@ auto_archive = false
 
 [view]
 # Start with completed tasks hidden (H toggles).
-hide_completed = false
+hide_completed = true
 # Starting sort: "priority", "due", "created" or "file" (s cycles).
 sort = "priority"
 # Show task numbers, the ones the command line uses (L toggles).

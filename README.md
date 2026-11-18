@@ -63,7 +63,7 @@ add_creation_date = true     # prefix new tasks with today's date
 auto_archive = false         # move tasks to done as soon as they're completed
 
 [view]
-hide_completed = false       # H toggles
+hide_completed = true        # H toggles
 sort = "priority"            # priority | due | created | file (s cycles)
 line_numbers = false         # L toggles; these are the numbers the commands use
 hide_keys = []               # key:value tags to hide from rows, e.g. ["uid"]

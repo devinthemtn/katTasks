@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/devinthemtn/katTasks/internal/config"
+	"github.com/devinthemtn/katTasks/internal/theme"
 	"github.com/devinthemtn/katTasks/internal/ui"
 )
 
@@ -18,6 +19,7 @@ func main() {
 	todoFile := fs.String("file", "", "todo.txt to open (overrides files.todo)")
 	makeConfig := fs.Bool("makeconfig", false, "create the settings file with every default, then exit")
 	updateConfig := fs.Bool("updateconfig", false, "add settings missing from the settings file (e.g. new in this version) as comments, then exit")
+	makeTheme := fs.String("maketheme", "", "write the current theme to themes/`NAME`.toml next to the settings, to edit; then exit")
 	showVersion := fs.Bool("version", false, "print the version, then exit")
 	fs.Usage = func() {
 		out := fs.Output()
@@ -39,6 +41,17 @@ func main() {
 		} else {
 			fmt.Println(*cfgPath, "already exists; left unchanged (try -updateconfig)")
 		}
+		return
+	case *makeTheme != "":
+		cfg, _, _ := config.Load(*cfgPath)
+		themes, _ := theme.Load(cfg.Dir())
+		cur, ok := theme.Find(themes, cfg.Theme)
+		if !ok {
+			cur, _ = theme.Find(themes, "default")
+		}
+		p, err := theme.Write(cfg.Dir(), *makeTheme, cur)
+		exitIf(err)
+		fmt.Printf("wrote %s (a copy of %q); set theme = %q to use it\n", p, cur.Name, *makeTheme)
 		return
 	case *updateConfig:
 		added, created, err := config.Update(*cfgPath)

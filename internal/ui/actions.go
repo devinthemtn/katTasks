@@ -124,6 +124,8 @@ func defineActions() []*action {
 			}
 			return nil
 		}},
+		{name: "theme_picker", desc: "pick theme", group: groupView, defaults: []string{"T"}, run: func(m *Model) tea.Cmd { m.openThemePicker(); return nil }},
+		{name: "cycle_theme", desc: "next theme", group: groupView, run: func(m *Model) tea.Cmd { m.cycleTheme(); return nil }},
 		{name: "reload", desc: "reload todo.txt", group: groupView, defaults: []string{"r"}, run: func(m *Model) tea.Cmd {
 			if err := m.load(); err != nil {
 				m.setError("reload failed: %v", err)

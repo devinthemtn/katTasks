@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/devinthemtn/katTasks/internal/config"
+	"github.com/devinthemtn/katTasks/internal/theme"
 	"github.com/devinthemtn/katTasks/internal/todo"
 )
 
@@ -30,6 +31,7 @@ const (
 	modeFilter
 	modePriority
 	modeConfirm
+	modeTheme
 )
 
 var sortModes = config.SortModes
@@ -108,6 +110,11 @@ type Model struct {
 	statusErr  bool
 	configWarn string // settings problems, shown until fixed and reloaded
 
+	st       styles
+	themes   []theme.Theme
+	theme    string // name of the theme in use
+	pickIdx  int    // theme picker cursor
+	pickPrev string // theme to restore if the picker is cancelled
 	km       keymap
 	pending  string // first key of a chord, waiting for the second
 	chordSeq int
@@ -156,7 +163,25 @@ func (m *Model) applyConfig(cfg config.Config) []error {
 	}
 	km, errs := buildKeymap(cfg.Keys)
 	m.km = km
+
+	themes, warns := theme.Load(cfg.Dir())
+	errs = append(errs, warns...)
+	m.themes = themes
+	if !m.useTheme(cfg.Theme) {
+		errs = append(errs, fmt.Errorf("theme = %q: no such theme (built-in: default, terminal, nord, gruvbox; or a file in %s)", cfg.Theme, theme.Dir(cfg.Dir())))
+		m.useTheme("default")
+	}
 	return errs
+}
+
+// useTheme switches to the named theme, reporting whether it exists.
+func (m *Model) useTheme(name string) bool {
+	t, ok := theme.Find(m.themes, name)
+	if !ok {
+		return false
+	}
+	m.theme, m.st = name, newStyles(t)
+	return true
 }
 
 func (m *Model) showConfigErrors(errs []error) {
@@ -531,11 +556,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+		typing := m.mode == modeAdd || m.mode == modeEdit || m.mode == modeFilter
+		// Keys typed quickly can arrive as one multi-rune message; outside
+		// text entry handle them one at a time, so e.g. "pB" sets priority B.
+		if !typing && msg.Type == tea.KeyRunes && len(msg.Runes) > 1 && !msg.Paste {
+			var cmds []tea.Cmd
+			var mdl tea.Model = m
+			for _, r := range msg.Runes {
+				var cmd tea.Cmd
+				mdl, cmd = mdl.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+				cmds = append(cmds, cmd)
+			}
+			return mdl, tea.Batch(cmds...)
+		}
 		switch m.mode {
 		case modeAdd, modeEdit, modeFilter:
 			return m.updateInput(msg)
 		case modePriority:
 			m.updatePriority(msg)
+			return m, nil
+		case modeTheme:
+			m.updateThemePicker(msg)
 			return m, nil
 		case modeConfirm:
 			if s := strings.ToLower(msg.String()); s == "y" {
@@ -546,18 +587,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.setStatus("cancelled")
 			}
 			return m, nil
-		}
-		// Keys typed quickly can arrive as one multi-rune message; handle
-		// them one at a time so e.g. "pB" sets priority B.
-		if msg.Type == tea.KeyRunes && len(msg.Runes) > 1 && !msg.Paste {
-			var cmds []tea.Cmd
-			var mdl tea.Model = m
-			for _, r := range msg.Runes {
-				var cmd tea.Cmd
-				mdl, cmd = mdl.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
-				cmds = append(cmds, cmd)
-			}
-			return mdl, tea.Batch(cmds...)
 		}
 		return m.updateNormal(msg)
 	}

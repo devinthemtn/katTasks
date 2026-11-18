@@ -1,49 +1,71 @@
 package ui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
 
-type ac = lipgloss.AdaptiveColor
-
-var (
-	cAccent   = ac{Light: "#6D4AE8", Dark: "#A78BFA"}
-	cMuted    = ac{Light: "#8A8A8A", Dark: "#6E6E7A"}
-	cText     = ac{Light: "#1F1F24", Dark: "#E6E6EA"}
-	cSelBg    = ac{Light: "#E9E4FF", Dark: "#34304A"}
-	cProject  = ac{Light: "#2E7D32", Dark: "#86D99A"}
-	cContext  = ac{Light: "#0B6FA4", Dark: "#7CC4FA"}
-	cRed      = ac{Light: "#C62828", Dark: "#FF7A7A"}
-	cOrange   = ac{Light: "#D35400", Dark: "#FFB062"}
-	cYellow   = ac{Light: "#9A7B00", Dark: "#F2D46B"}
-	cBlueGray = ac{Light: "#546E7A", Dark: "#9FB3C8"}
-
-	sTitle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFFFFF")).Background(cAccent).Padding(0, 1)
-	sFaint     = lipgloss.NewStyle().Foreground(cMuted)
-	sText      = lipgloss.NewStyle().Foreground(cText)
-	sProject   = lipgloss.NewStyle().Foreground(cProject)
-	sContext   = lipgloss.NewStyle().Foreground(cContext)
-	sTag       = lipgloss.NewStyle().Foreground(cMuted)
-	sDone      = lipgloss.NewStyle().Foreground(cMuted).Strikethrough(true)
-	sHeader    = lipgloss.NewStyle().Foreground(cMuted).Bold(true)
-	sError     = lipgloss.NewStyle().Foreground(cRed).Bold(true)
-	sOK        = lipgloss.NewStyle().Foreground(cProject)
-	sPrompt    = lipgloss.NewStyle().Foreground(cAccent).Bold(true)
-	sHelpKey   = lipgloss.NewStyle().Foreground(cText).Bold(true)
-	sSuggest   = lipgloss.NewStyle().Foreground(cMuted)
-	sSuggestOn = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Background(cAccent).Padding(0, 1)
-
-	sPane        = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(cMuted)
-	sPaneFocused = sPane.BorderForeground(cAccent)
+	"github.com/devinthemtn/katTasks/internal/theme"
 )
 
-func priorityStyle(p byte) lipgloss.Style {
-	switch p {
-	case 'A':
-		return lipgloss.NewStyle().Foreground(cRed).Bold(true)
-	case 'B':
-		return lipgloss.NewStyle().Foreground(cOrange).Bold(true)
-	case 'C':
-		return lipgloss.NewStyle().Foreground(cYellow).Bold(true)
-	default:
-		return lipgloss.NewStyle().Foreground(cBlueGray)
+// styles are the lipgloss styles for one theme.
+type styles struct {
+	title, faint, text, project, context, tag, done, header lipgloss.Style
+	err, ok, prompt, helpKey, suggest, suggestOn            lipgloss.Style
+	pane, paneFocused                                       lipgloss.Style
+	due, today, overdue                                     lipgloss.Style
+	pri                                                     [5]lipgloss.Style // A, B, C, D, E–Z
+
+	cursorBg, selectedBg, matchBg lipgloss.TerminalColor
+}
+
+func termColor(c theme.Color) lipgloss.TerminalColor {
+	switch {
+	case c.Light == "" && c.Dark == "":
+		return lipgloss.NoColor{}
+	case c.Light == c.Dark:
+		return lipgloss.Color(c.Dark)
 	}
+	return lipgloss.AdaptiveColor{Light: c.Light, Dark: c.Dark}
+}
+
+func newStyles(t theme.Theme) styles {
+	c := func(k string) lipgloss.TerminalColor { return termColor(t.Get(k)) }
+	fg := func(k string) lipgloss.Style { return lipgloss.NewStyle().Foreground(c(k)) }
+	pane := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(c("border"))
+	return styles{
+		title:     lipgloss.NewStyle().Bold(true).Foreground(c("title_fg")).Background(c("title_bg")).Padding(0, 1),
+		faint:     fg("dim"),
+		text:      fg("fg"),
+		project:   fg("project"),
+		context:   fg("context"),
+		tag:       fg("tag"),
+		done:      fg("done").Strikethrough(true),
+		header:    fg("dim").Bold(true),
+		err:       fg("error").Bold(true),
+		ok:        fg("ok"),
+		prompt:    fg("accent").Bold(true),
+		helpKey:   fg("fg").Bold(true),
+		suggest:   fg("dim"),
+		suggestOn: lipgloss.NewStyle().Foreground(c("title_fg")).Background(c("accent")).Padding(0, 1),
+
+		pane:        pane,
+		paneFocused: pane.BorderForeground(c("border_focus")),
+
+		due:     fg("due"),
+		today:   fg("today").Bold(true),
+		overdue: fg("overdue").Bold(true),
+		pri: [5]lipgloss.Style{
+			fg("pri_a").Bold(true), fg("pri_b").Bold(true), fg("pri_c").Bold(true), fg("pri_d"), fg("pri_other"),
+		},
+
+		cursorBg:   c("cursor_bg"),
+		selectedBg: c("selected_bg"),
+		matchBg:    c("match_bg"),
+	}
+}
+
+func (st styles) priority(p byte) lipgloss.Style {
+	if p >= 'A' && p <= 'D' {
+		return st.pri[p-'A']
+	}
+	return st.pri[4]
 }

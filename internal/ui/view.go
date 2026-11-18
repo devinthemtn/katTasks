@@ -407,8 +407,9 @@ func (m Model) fullHelp(w int) string {
 	if j := lipgloss.JoinHorizontal(lipgloss.Top, cols[0], gap, cols[1], gap, cols[2]); lipgloss.Width(j) <= w {
 		return j
 	}
-	if j := lipgloss.JoinHorizontal(lipgloss.Top, cols[0], gap, cols[1]); lipgloss.Width(j) <= w {
-		return j + "\n\n" + cols[2]
+	// MOVE is the shortest column, so VIEW goes under it.
+	if j := lipgloss.JoinHorizontal(lipgloss.Top, cols[0]+"\n\n"+cols[2], gap, cols[1]); lipgloss.Width(j) <= w {
+		return j
 	}
 	return strings.Join(cols, "\n\n")
 }

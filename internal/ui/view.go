@@ -94,7 +94,7 @@ func (m Model) viewBody() string {
 		main = lipgloss.NewStyle().Padding(0, 1).Render(m.viewThemePicker())
 	} else if m.showHelp {
 		main = lipgloss.NewStyle().Padding(0, 1).Render(
-			m.st.header.Render("KEYS") + "\n\n" + m.fullHelp(lw-4) + "\n\n" + m.inputHelp() +
+			m.st.header.Render("KEYS") + m.st.faint.Render("   katTasks "+m.opts.Version) + "\n\n" + m.fullHelp(lw-4) + "\n\n" + m.inputHelp() +
 				"\n\n" + m.st.faint.Render("press any key to close"))
 	} else {
 		main = m.viewList(lw-2, inner)

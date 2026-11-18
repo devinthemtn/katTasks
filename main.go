@@ -102,7 +102,7 @@ func main() {
 	if created {
 		fmt.Fprintf(os.Stderr, "katTasks: wrote default settings to %s\n", *cfgPath)
 	}
-	m, err := ui.New(cfg, ui.Options{ConfigPath: *cfgPath, TodoFile: *todoFile, Errors: errs})
+	m, err := ui.New(cfg, ui.Options{ConfigPath: *cfgPath, TodoFile: *todoFile, Errors: errs, Version: Version()})
 	exitIf(err)
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		exitIf(err)

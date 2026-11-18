@@ -142,6 +142,7 @@ type Options struct {
 	ConfigPath string  // settings file, re-read by Ctrl-r
 	TodoFile   string  // -file override; empty uses files.todo
 	Errors     []error // problems found while loading the settings
+	Version    string  // shown on the help screen
 }
 
 // New builds the model and loads the todo file.

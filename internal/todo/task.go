@@ -263,3 +263,15 @@ func ResolveDate(v string, now time.Time) (time.Time, bool) {
 	}
 	return time.Time{}, false
 }
+
+// NewTask parses text typed by the user into a task: relative due dates
+// become absolute, and today's creation date is added when addCreated is
+// set and the text has none.
+func NewTask(text string, now time.Time, addCreated bool) *Task {
+	t := Parse(text)
+	t.NormalizeDue(now)
+	if addCreated && t.Created.IsZero() && !t.Done {
+		t.Created = truncateDay(now)
+	}
+	return t
+}

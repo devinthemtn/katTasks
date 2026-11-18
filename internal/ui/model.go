@@ -787,12 +787,7 @@ func (m *Model) submitInput() {
 			m.setStatus("nothing added")
 			return
 		}
-		t := todo.Parse(val)
-		t.NormalizeDue(time.Now())
-		if m.cfg.Tasks.AddCreationDate && t.Created.IsZero() && !t.Done {
-			y, mo, d := time.Now().Date()
-			t.Created = time.Date(y, mo, d, 0, 0, 0, 0, time.Local)
-		}
+		t := todo.NewTask(val, time.Now(), m.cfg.Tasks.AddCreationDate)
 		if m.mutate(func() { m.tasks = append(m.tasks, t) }) {
 			m.setStatus("added")
 		}

@@ -2,12 +2,14 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/devinthemtn/katTasks/internal/cli"
 	"github.com/devinthemtn/katTasks/internal/config"
 	"github.com/devinthemtn/katTasks/internal/theme"
 	"github.com/devinthemtn/katTasks/internal/ui"
@@ -21,10 +23,15 @@ func main() {
 	updateConfig := fs.Bool("updateconfig", false, "add settings missing from the settings file (e.g. new in this version) as comments, then exit")
 	makeTheme := fs.String("maketheme", "", "write the current theme to themes/`NAME`.toml next to the settings, to edit; then exit")
 	showVersion := fs.Bool("version", false, "print the version, then exit")
+	asJSON := fs.Bool("json", false, "commands print JSON")
+	force := fs.Bool("f", false, "commands don't ask before deleting")
 	fs.Usage = func() {
 		out := fs.Output()
-		fmt.Fprintf(out, "Usage: katTasks [flags]\n\n")
+		fmt.Fprintf(out, "Usage: katTasks [flags]                 open the task list\n")
+		fmt.Fprintf(out, "       katTasks [flags] COMMAND ARGS  run one command and exit\n\nFlags (before the command):\n")
 		fs.PrintDefaults()
+		fmt.Fprintf(out, "\nCommands (N is a task number, as L shows in the task list):\n%s", cli.Usage())
+		fmt.Fprintf(out, "\nQueries for ls/lsa: words, +proj, @ctx, due:+1w, due:-3d, due:overdue, pri:A-C, -term\n")
 		fmt.Fprintf(out, "\nSettings: %s\n", *cfgPath)
 	}
 	flag.Parse()
@@ -69,12 +76,29 @@ func main() {
 		}
 		return
 	}
-	if fs.NArg() > 0 {
-		fs.Usage()
-		os.Exit(2)
+	cfg, created, errs := config.Load(*cfgPath)
+	if *todoFile != "" {
+		cfg.SetTodo(*todoFile)
 	}
 
-	cfg, created, errs := config.Load(*cfgPath)
+	if fs.NArg() > 0 {
+		if !cli.IsCommand(fs.Arg(0)) {
+			fmt.Fprintf(os.Stderr, "katTasks: unknown command %q\n\n", fs.Arg(0))
+			fs.Usage()
+			os.Exit(2)
+		}
+		for _, e := range errs {
+			fmt.Fprintln(os.Stderr, "katTasks: warning:", e)
+		}
+		err := cli.Run(cli.Env{Cfg: cfg, JSON: *asJSON, Force: *force, In: os.Stdin, Out: os.Stdout}, fs.Args())
+		if errors.Is(err, cli.ErrUsage) {
+			fmt.Fprintln(os.Stderr, "katTasks:", err)
+			os.Exit(2)
+		}
+		exitIf(err)
+		return
+	}
+
 	if created {
 		fmt.Fprintf(os.Stderr, "katTasks: wrote default settings to %s\n", *cfgPath)
 	}

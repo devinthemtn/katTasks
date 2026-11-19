@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/devinthemtn/katTasks/internal/theme"
+	"github.com/devinthemtn/katTasks/internal/todo"
 )
 
 func TestParseKeyMsgRoundTrip(t *testing.T) {
@@ -190,5 +191,56 @@ func TestHeadlessDoingAndProgress(t *testing.T) {
 	s = keys(h, "i", ">", "x", "H") // H: completed tasks are hidden by default
 	if r := s.Rows[0]; !r.Done || r.Status != "" || r.Progress != "" || len(r.Words) != 4 {
 		t.Fatalf("done row %+v", r)
+	}
+}
+
+func TestAtSuggestions(t *testing.T) {
+	now := time.Date(2026, 11, 19, 14, 7, 0, 0, time.Local)
+	firsts := func(w string, now time.Time, n int) []string { return atSuggestions(w, now)[:n] }
+	cases := []struct {
+		w    string
+		now  time.Time
+		want []string
+	}{
+		{"at:", now, []string{"at:14:30", "at:15:00", "at:15:30"}},
+		{"at:", time.Date(2026, 11, 19, 23, 50, 0, 0, time.Local), []string{"at:0:00", "at:0:30"}},
+		{"at:9", now, []string{"at:14:15", "at:14:30"}}, // unfiltered; updateSuggestions filters
+		{"at:3p", now, []string{"at:2:15pm", "at:2:30pm"}},
+	}
+	for _, c := range cases {
+		if got := firsts(c.w, c.now, len(c.want)); strings.Join(got, " ") != strings.Join(c.want, " ") {
+			t.Errorf("%q: got %q, want %q", c.w, got, c.want)
+		}
+	}
+}
+
+func TestHeadlessAtCompletion(t *testing.T) {
+	h, _ := headless(t)
+	s := keys(h, "a")
+	for _, r := range "Lunch at:9" {
+		s = h.Key(string(r))
+	}
+	if len(s.Input.Sugg) == 0 || s.Input.Sugg[0] != "at:9:00" && !strings.HasPrefix(s.Input.Sugg[0], "at:9:") {
+		t.Fatalf("suggestions %q", s.Input.Sugg)
+	}
+	for _, g := range s.Input.Sugg {
+		if !strings.HasPrefix(g, "at:9:") {
+			t.Errorf("suggestion %q doesn't fit at:9", g)
+		}
+	}
+	s = h.Key("tab")
+	if !strings.HasPrefix(s.Input.Value, "Lunch at:9:") {
+		t.Fatalf("after tab: %q", s.Input.Value)
+	}
+	if _, ok := todo.ParseClock(strings.TrimSpace(strings.TrimPrefix(s.Input.Value, "Lunch at:")), true); !ok {
+		t.Errorf("inserted time doesn't parse: %q", s.Input.Value)
+	}
+
+	// The ones for 3p are 12-hour times that parse too.
+	for _, r := range " at:3p" {
+		s = h.Key(string(r))
+	}
+	if len(s.Input.Sugg) == 0 || s.Input.Sugg[0] != "at:3pm" {
+		t.Fatalf("3p suggestions %q", s.Input.Sugg)
 	}
 }

@@ -719,6 +719,42 @@ var keywordWords = []string{
 	"rec:1d", "rec:1b", "rec:1w", "rec:2w", "rec:1m", "rec:1y", "rec:+1w", "rec:+1m", "rec:+1y",
 }
 
+// atSuggestions are at: times for word (lowercase, starting "at:"), soonest
+// after now first. "at:" alone gives the next half hours; a partial time
+// ("at:9", "at:14:3") gives the quarter hours it could be, and one with a or
+// p in it ("at:3p") gives 12-hour times. They're written as ParseClock reads.
+func atSuggestions(word string, now time.Time) []string {
+	v := strings.TrimPrefix(word, "at:")
+	step := 15
+	if v == "" {
+		step = 30
+	}
+	twelve := strings.ContainsAny(v, "ap")
+	start := now.Hour()*60 + now.Minute()
+	start += step - start%step // the next slot after now
+	var out []string
+	for i := 0; i < 24*60/step; i++ {
+		min := (start + i*step) % (24 * 60)
+		if !twelve {
+			out = append(out, "at:"+todo.FormatClock(min))
+			continue
+		}
+		h, mm, ap := min/60, min%60, "am"
+		if h >= 12 {
+			ap = "pm"
+		}
+		if h = h % 12; h == 0 {
+			h = 12
+		}
+		if mm == 0 {
+			out = append(out, fmt.Sprintf("at:%d%s", h, ap))
+		} else {
+			out = append(out, fmt.Sprintf("at:%d:%02d%s", h, mm, ap))
+		}
+	}
+	return out
+}
+
 // wordAtCursor returns the start index (in runes) and text of the word that
 // ends at the cursor.
 func (m *Model) wordAtCursor() (int, string) {
@@ -754,6 +790,11 @@ func (m *Model) updateSuggestions() {
 		return
 	case w[0] == '+' || w[0] == '@':
 		pool = m.known
+	case strings.HasPrefix(lw, "at:"):
+		if m.mode == modeFilter {
+			return
+		}
+		pool = atSuggestions(lw, time.Now())
 	case len(lw) >= 3 && (strings.HasPrefix("due:", lw) || strings.HasPrefix(lw, "due:") ||
 		strings.HasPrefix("rec:", lw) || strings.HasPrefix(lw, "rec:")):
 		if m.mode == modeFilter {

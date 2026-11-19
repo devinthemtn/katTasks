@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"flag"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	"github.com/devinthemtn/katTasks/internal/alert"
 	"github.com/devinthemtn/katTasks/internal/config"
 )
 
@@ -71,6 +73,12 @@ func main() {
 		BackgroundColour: application.NewRGB(24, 24, 31),
 		URL:              "/",
 	})
+
+	// [alerts] reminders while the window is open; katTasks remind sends
+	// them when it isn't, and each one goes off once between them.
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	go alert.Watch(ctx, alert.Options{Source: alert.FileSource(*cfgPath, *todoFile), Logf: log.Printf})
 
 	if err := app.Run(); err != nil {
 		log.Println(err)

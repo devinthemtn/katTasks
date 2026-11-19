@@ -62,6 +62,20 @@ Unicode true
     Pop $0
 !macroend
 
+# katTasks remind, the background reminder ([alerts] in the settings), runs
+# from this Run value at sign-in, the same one `katTasks remind -install`
+# writes. conhost --headless keeps it from opening a console window.
+!define KATTASKS_RUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
+!define KATTASKS_RUN_VALUE "katTasks remind"
+!define KATTASKS_REMIND `conhost.exe --headless "$INSTDIR\katTasks.exe" remind`
+
+# Stops a running katTasks remind, which would otherwise keep katTasks.exe
+# locked. An open terminal katTasks is left alone.
+!macro kattasks.stopremind
+    nsExec::ExecToLog `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $$_.Name -eq 'katTasks.exe' -and $$_.CommandLine -match ' remind' } | ForEach-Object { Stop-Process -Id $$_.ProcessId -Force }"`
+    Pop $0
+!macroend
+
 # The version information for this two must consist of 4 parts
 VIProductVersion "${INFO_PRODUCTVERSION}.0"
 VIFileVersion    "${INFO_PRODUCTVERSION}.0"
@@ -116,11 +130,16 @@ Section
 
     !insertmacro wails.webview2runtime
 
+    !insertmacro kattasks.stopremind
+
     SetOutPath $INSTDIR
     
     !insertmacro wails.files
     File "/oname=katTasks.exe" "${KATTASKS_CLI}"
     !insertmacro kattasks.path add
+
+    WriteRegStr HKCU "${KATTASKS_RUN_KEY}" "${KATTASKS_RUN_VALUE}" `${KATTASKS_REMIND}`
+    Exec `${KATTASKS_REMIND}`
 
     CreateShortcut "$SMPROGRAMS\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
     CreateShortCut "$DESKTOP\${INFO_PRODUCTNAME}.lnk" "$INSTDIR\${PRODUCT_EXECUTABLE}"
@@ -137,6 +156,9 @@ Section "uninstall"
     RMDir /r "$AppData\${PRODUCT_EXECUTABLE}" # Remove the WebView2 DataPath
 
     !insertmacro kattasks.path remove
+
+    !insertmacro kattasks.stopremind
+    DeleteRegValue HKCU "${KATTASKS_RUN_KEY}" "${KATTASKS_RUN_VALUE}"
 
     # Only the programs: todo.txt and %APPDATA%\katTasks (settings, themes, scripts) stay.
     RMDir /r $INSTDIR

@@ -196,10 +196,19 @@ tasks:
       - task: build # for katTasks -paths below; skipped if install already built it
       - printf '\nWindows, in %s:\n' "$(wslpath -w "{{.WIN_INSTALL_DIR}}" 2>/dev/null || echo "{{.WIN_INSTALL_DIR}}")"
       - build/step.sh "Building katTasks.exe and katTasks-gui.exe" "{{.TASK_EXE}}" build-windows
-      - >-
-        build/step.sh "Copying them there" sh -c
-        'install -Dm755 "{{.BIN_DIR}}/katTasks.exe" "{{.WIN_INSTALL_DIR}}/katTasks.exe" &&
-        install -Dm755 "{{.GUI_DIR}}/bin/katTasks-gui.exe" "{{.WIN_INSTALL_DIR}}/katTasks-gui.exe"'
+      # A running katTasks remind (the background reminder) locks
+      # katTasks.exe, so it's stopped for the copy and started again after.
+      - |
+        ps="Get-CimInstance Win32_Process | Where-Object { \$_.Name -eq 'katTasks.exe' -and \$_.CommandLine -match ' remind' } | ForEach-Object { Stop-Process -Id \$_.ProcessId -Force; 1 }"
+        stopped=$(cd /mnt/c && powershell.exe -NoProfile -Command "$ps" 2>/dev/null | tr -d '\r' | grep -c 1 || true)
+        build/step.sh "Copying them there" sh -c \
+          'install -Dm755 "{{.BIN_DIR}}/katTasks.exe" "{{.WIN_INSTALL_DIR}}/katTasks.exe" &&
+          install -Dm755 "{{.GUI_DIR}}/bin/katTasks-gui.exe" "{{.WIN_INSTALL_DIR}}/katTasks-gui.exe"'
+        if [ "${stopped:-0}" -gt 0 ]; then
+          exe=$(wslpath -w "{{.WIN_INSTALL_DIR}}/katTasks.exe")
+          (cd /mnt/c && powershell.exe -NoProfile -Command "Start-Process -FilePath '$exe' -ArgumentList remind -WindowStyle Hidden")
+          printf '  %-17s %s\n' "katTasks remind" "restarted"
+        fi
       - printf '  %-17s %s\n' katTasks.exe "the terminal app and commands" katTasks-gui.exe "the desktop app"
       # The Linux todo.txt, as the Windows apps see it (\\wsl.localhost\...).
       # PowerShell runs from the install folder, since it can't start in a

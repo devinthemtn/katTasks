@@ -109,11 +109,12 @@ func (m Model) viewBody() string {
 
 func (m Model) inputHelp() string {
 	return m.st.header.Render("WHILE TYPING") + "\n\n" + m.st.faint.Render(strings.Join([]string{
-		"tab        complete +project / @context / due:",
+		"tab        complete +project / @context / due: / at:",
 		"↑/↓        choose suggestion",
 		"enter      save        esc  cancel",
 		"due:       today, tomorrow, mon..sun, +3d, +2w, +1m",
 		"rec:       1d 2w 1m 1y 5b (b = business days); rec:+1w = from due date",
+		"at:        9:30 14:00 3pm; on the due: day, or every day without one",
 		"/name      run a Lua script from scripts/ (tab, or when saving)",
 	}, "\n"))
 }

@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/BurntSushi/toml"
 )
@@ -59,6 +60,16 @@ type Config struct {
 		FontFamily string `toml:"font_family"`
 		FontSize   int    `toml:"font_size"`
 	} `toml:"gui"`
+	Alerts struct {
+		Enabled   bool   `toml:"enabled"`
+		Lead      string `toml:"lead"`
+		Popup     bool   `toml:"popup"`
+		Sound     bool   `toml:"sound"`
+		SoundFile string `toml:"sound_file"`
+
+		// LeadTime is Lead parsed.
+		LeadTime time.Duration `toml:"-"`
+	} `toml:"alerts"`
 	RawKeys map[string]any    `toml:"keys"`
 	Filters map[string]string `toml:"filters"`
 
@@ -203,6 +214,15 @@ func (c *Config) normalize() []error {
 	if c.GUI.FontSize < MinFontSize || c.GUI.FontSize > MaxFontSize {
 		bad("gui.font_size", c.GUI.FontSize, fmt.Sprintf("want %d to %d", MinFontSize, MaxFontSize))
 		c.GUI.FontSize = DefaultFontSize
+	}
+	if d, err := time.ParseDuration(strings.TrimSpace(c.Alerts.Lead)); err != nil || d < 0 || d > 24*time.Hour {
+		bad("alerts.lead", fmt.Sprintf("%q", c.Alerts.Lead), `want a time such as "0m", "10m" or "1h"`)
+		c.Alerts.Lead, c.Alerts.LeadTime = "10m", 10*time.Minute
+	} else {
+		c.Alerts.LeadTime = d
+	}
+	if c.Alerts.SoundFile != "" {
+		c.Alerts.SoundFile = Expand(c.Alerts.SoundFile)
 	}
 	for i, k := range c.View.HideKeys {
 		c.View.HideKeys[i] = strings.ToLower(strings.TrimSpace(k))

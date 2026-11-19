@@ -137,6 +137,13 @@ command = ""                 # also pipe copies to this, e.g. "wl-copy" or "clip
 font_family = ""             # e.g. "Fira Code" or "Iosevka, Menlo"; empty = a built-in monospace list
 font_size = 14               # pixels, 8–48; ctrl+= / ctrl+- zoom, ctrl+0 returns to this
 
+[alerts]                     # see Alerts below
+enabled = true               # notify at a task's at: time
+lead = "10m"                 # this long before it; "0m" at the time
+popup = true                 # a desktop notification
+sound = true                 # and a sound
+sound_file = ""              # empty = the system's notification sound; .wav works everywhere
+
 [keys]                       # action = "key" or ["key", "key"]
 # add = ["a", "n"]
 # top = "gg"
@@ -204,8 +211,9 @@ Keys are written like `ctrl+u`, `alt+x`, `shift+tab`, `enter`, `esc`, `space`,
 
 Adding (`a`) or editing a task opens a small box in the middle of the screen,
 with a reminder of the `(A)`, `+project`, `@context`, `due:` and `rec:` syntax
-underneath. While typing a task, `tab` completes `+project`, `@context`, `due:` and `rec:`
-words. Relative due dates are converted to `YYYY-MM-DD` when you save:
+underneath. While typing a task, `tab` completes `+project`, `@context`, `due:`, `rec:`
+and `at:` words; `at:` offers the next half hours, and times that fit what
+you've typed (`at:9` → `at:9:00`, `at:9:15`…; `at:3p` → `at:3pm`). Relative due dates are converted to `YYYY-MM-DD` when you save:
 `due:today`, `due:tomorrow`, `due:fri`, `due:+3d`, `due:+2w`, `due:+1m`. When a
 project or context is selected in the sidebar, `a` fills it in for you.
 
@@ -277,6 +285,45 @@ top, then its timed tasks placed down the day by time.
 Matching words are highlighted. `fs` saves the current search (or the selected
 project or context) to `[filters]`. Saved searches appear in the sidebar under
 SAVED and in the palette.
+
+## Alerts
+
+A task with an `at:` tag alerts you at that time, with a desktop notification
+and a sound: `Dentist due:2026-12-01 at:14:30` on December 1, and `Standup
+at:9:30` (no `due:`) every day. Only `at:` tags count, not times written in
+the text. Done tasks don't alert. Set it up under `[alerts]` in the settings:
+
+```toml
+[alerts]
+enabled = true
+lead = "10m"       # alert this long before the at: time; "0m" at the time
+popup = true       # desktop notification
+sound = true
+sound_file = ""    # e.g. "~/sounds/bell.wav"; empty = the system's notification sound
+```
+
+katTasks and katTasks-gui alert while they're open. For alerts when neither
+is, run the background reminder at login:
+
+    katTasks remind -install     # start it at login (-uninstall stops that)
+    katTasks remind -test        # send a sample alert now, to check your setup
+
+Each alert goes off once, whichever of them is running. An alert missed
+while the computer slept still goes off within 15 minutes of its time;
+later than that it's skipped.
+
+| OS | notification | sound | started at login by |
+|---|---|---|---|
+| Linux | `notify-send` (libnotify), or `gdbus` | `canberra-gtk-play`, or `paplay` / `pw-play` / `aplay` | `~/.config/autostart/katTasks-remind.desktop` |
+| macOS | Notification Center, through `osascript` | the "Glass" sound; `afplay` for `sound_file` | a launch agent in `~/Library/LaunchAgents` |
+| Windows | a toast, through Windows PowerShell | the toast's sound; `sound_file` must be `.wav` | the `katTasks remind` Run entry for your user |
+| WSL | a Windows toast, as on Windows | as on Windows | install it on the Windows side (below) |
+
+The Windows installer sets up and starts the reminder itself, and the
+uninstaller removes it. Under WSL, `task install` doesn't; run `katTasks.exe
+remind -install` from Windows once if you want it. On macOS the
+notifications come from Script Editor, which macOS may ask you to allow the
+first time.
 
 ## In progress
 
@@ -405,6 +452,7 @@ the task list to see the numbers. Several numbers can be given as `do 2 5` or
 | `lsa [QUERY…]` (`listall`) | the same, including done.txt (numbered 0) |
 | `lsp [X or A-C]` (`listpri`) | tasks with a priority |
 | `lsprj` (`listproj`), `lsc` (`listcon`) | every project / context |
+| `remind` | run the background reminder; `-test`, `-install`, `-uninstall`, see [Alerts](#alerts) |
 
 ```
 $ katTasks add "Pay rent +Home due:2026-12-01 rec:+1m"

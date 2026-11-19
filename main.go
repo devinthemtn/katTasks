@@ -2,13 +2,17 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/devinthemtn/katTasks/internal/alert"
 	"github.com/devinthemtn/katTasks/internal/cli"
 	"github.com/devinthemtn/katTasks/internal/config"
 	"github.com/devinthemtn/katTasks/internal/theme"
@@ -32,6 +36,7 @@ func main() {
 		fmt.Fprintf(out, "       katTasks [flags] COMMAND ARGS  run one command and exit\n\nFlags (before the command):\n")
 		fs.PrintDefaults()
 		fmt.Fprintf(out, "\nCommands (N is a task number, as L shows in the task list):\n%s", cli.Usage())
+		fmt.Fprintf(out, "  %-24s %s\n", "remind [-test|-install|-uninstall]", "send [alerts] reminders in the background; -test sends one now")
 		fmt.Fprintf(out, "\nQueries for ls/lsa: words, +proj, @ctx, due:+1w, due:-3d, due:overdue, pri:A-C, -term\n")
 		fmt.Fprintf(out, "\nSettings: %s\n", *cfgPath)
 	}
@@ -89,6 +94,10 @@ func main() {
 		cfg.SetTodo(*todoFile)
 	}
 
+	if fs.Arg(0) == "remind" {
+		remind(fs.Args()[1:], *cfgPath, *todoFile)
+		return
+	}
 	if fs.NArg() > 0 {
 		if !cli.IsCommand(fs.Arg(0)) {
 			fmt.Fprintf(os.Stderr, "katTasks: unknown command %q\n\n", fs.Arg(0))
@@ -112,8 +121,61 @@ func main() {
 	}
 	m, err := ui.New(cfg, ui.Options{ConfigPath: *cfgPath, TodoFile: *todoFile, Errors: errs, Version: Version()})
 	exitIf(err)
+	ctx, stop := context.WithCancel(context.Background())
+	defer stop()
+	go alert.Watch(ctx, alert.Options{Source: alert.FileSource(*cfgPath, *todoFile)})
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		exitIf(err)
+	}
+}
+
+// remind is the katTasks remind command: the background reminder.
+func remind(args []string, cfgPath, todoFile string) {
+	rf := flag.NewFlagSet("remind", flag.ExitOnError)
+	test := rf.Bool("test", false, "send a sample alert now, with the [alerts] settings, then exit")
+	install := rf.Bool("install", false, "start katTasks remind at login")
+	uninstall := rf.Bool("uninstall", false, "stop starting it at login")
+	rf.Usage = func() {
+		fmt.Fprintf(rf.Output(), "Usage: katTasks [flags] remind [-test|-install|-uninstall]\n\n"+
+			"Without a flag it runs until stopped, sending the alerts in [alerts] of\n%s.\n\n", cfgPath)
+		rf.PrintDefaults()
+	}
+	rf.Parse(args)
+
+	switch {
+	case *test:
+		cfg, _, _ := config.Load(cfgPath)
+		s := alert.SettingsOf(cfg)
+		if !s.Popup && !s.Sound {
+			exitIf(errors.New("alerts.popup and alerts.sound are both off"))
+		}
+		exitIf(alert.Test(s))
+		fmt.Println("sent a test alert")
+	case *install:
+		// The same settings and todo file as this run.
+		var argv []string
+		if cfgPath != config.DefaultPath() {
+			abs, _ := filepath.Abs(config.Expand(cfgPath))
+			argv = append(argv, "-config", abs)
+		}
+		if todoFile != "" {
+			abs, _ := filepath.Abs(config.Expand(todoFile))
+			argv = append(argv, "-file", abs)
+		}
+		msg, err := alert.Install(append(argv, "remind"))
+		exitIf(err)
+		fmt.Println(msg)
+	case *uninstall:
+		msg, err := alert.Uninstall()
+		exitIf(err)
+		fmt.Println(msg)
+	default:
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		alert.Watch(ctx, alert.Options{
+			Source: alert.FileSource(cfgPath, todoFile),
+			Logf:   func(f string, a ...any) { fmt.Fprintf(os.Stderr, "katTasks: "+f+"\n", a...) },
+		})
 	}
 }
 

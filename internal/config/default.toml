@@ -52,6 +52,22 @@ font_family = ""
 # ctrl+0 returns to this size.
 font_size = 14
 
+[alerts]
+# Remind you of open tasks that have an at: time (at:14:30, at:3pm), on their
+# due: day, or every day if they have no due:. katTasks, katTasks-gui and
+# katTasks remind (the background reminder; katTasks remind -install starts
+# it at login) all watch the clock, and each alert goes off only once.
+enabled = true
+# How long before the at: time to alert, e.g. "0m", "10m", "1h".
+lead = "10m"
+# Show a desktop notification.
+popup = true
+# Play a sound.
+sound = true
+# A sound file to play instead of the system's notification sound. .wav
+# works everywhere; .oga and .mp3 where the system player supports them.
+sound_file = ""
+
 [keys]
 # Rebind any action: name = "key" or ["key", "other key"]. Keys use names
 # like "ctrl+u", "enter", "space", "tab"; two plain characters such as "gg"

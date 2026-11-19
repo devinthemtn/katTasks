@@ -49,7 +49,7 @@ func (m Model) viewTaskPopup(maxW int) string {
 		m.st.project.Render("+project ") + m.st.context.Render("@context ") + m.st.tag.Render("key:value"),
 		m.st.tag.Render("due:") + m.st.faint.Render("today tomorrow fri +3d +2w +1m 2026-12-01"),
 		m.st.tag.Render("rec:") + m.st.faint.Render("1w 3d 5b 1m 1y · rec:+1w counts from due"),
-		m.st.tag.Render("at:") + m.st.faint.Render("9:30 14:00 3pm · a time, for the agenda"),
+		m.st.tag.Render("at:") + m.st.faint.Render("9:30 14:00 3pm · on its due: day, or daily; agenda + alerts"),
 		m.st.tag.Render("status:doing progress:40 ") + m.st.faint.Render("in progress · i > < in the list"),
 		key("/name ") + m.st.faint.Render("run a Lua script from scripts/"),
 		"",

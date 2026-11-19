@@ -171,16 +171,17 @@
     [{ text: '+project ', style: 'project' }, { text: '@context ', style: 'context' }, { text: 'key:value', style: 'tag' }],
     [{ text: 'due:', style: 'tag' }, { text: 'today tomorrow fri +3d +2w +1m 2026-12-01', style: 'dim' }],
     [{ text: 'rec:', style: 'tag' }, { text: '1w 3d 5b 1m 1y · rec:+1w counts from due', style: 'dim' }],
-    [{ text: 'at:', style: 'tag' }, { text: '9:30 14:00 3pm · a time, for the agenda', style: 'dim' }],
+    [{ text: 'at:', style: 'tag' }, { text: '9:30 14:00 3pm · on its due: day, or daily; agenda + alerts', style: 'dim' }],
     [{ text: 'status:doing progress:40 ', style: 'tag' }, { text: 'in progress · i > < in the list', style: 'dim' }],
     [{ text: '/name ', style: 'key' }, { text: 'run a Lua script from scripts/', style: 'dim' }],
   ];
   const typingHelp = [
-    'tab        complete +project / @context / due:',
+    'tab        complete +project / @context / due: / at:',
     '↑/↓        choose suggestion',
     'enter      save        esc  cancel',
     'due:       today, tomorrow, mon..sun, +3d, +2w, +1m',
     'rec:       1d 2w 1m 1y 5b (b = business days); rec:+1w = from due date',
+    'at:        9:30 14:00 3pm; on the due: day, or every day without one',
     '/name      run a Lua script from scripts/ (tab, or when saving)',
   ];
 

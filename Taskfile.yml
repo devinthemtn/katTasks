@@ -1,0 +1,171 @@
+# Build tasks for katTasks (CLI + TUI) and katTasks-gui (Wails v3 GUI).
+# Requires go-task. Run "task --list" to see all tasks.
+version: '3'
+
+vars:
+  BIN_DIR: bin
+  GUI_DIR: katTasks-gui
+  # GUI tasks run the Wails Taskfile in katTasks-gui/ as a sub-process,
+  # since its tasks expect ROOT_DIR to be katTasks-gui/.
+  GUI_TASK: '"{{.TASK_EXE}}" -d {{.GUI_DIR}}'
+  # Linux GUI builds use GTK3 + webkit2gtk-4.1 (Wails v3 defaults to GTK4).
+  GUI_TAGS: gtk3
+  # Without the leading v, as release builds stamp it.
+  VERSION:
+    sh: git describe --tags --always --dirty 2>/dev/null | sed 's/^v//' || echo dev
+  LDFLAGS: -X main.version={{.VERSION}}
+  BINDIR:
+    sh: echo "$(go env GOPATH)/bin"
+  EXE:
+    sh: go env GOEXE
+  # x.y.z of the last tag, for the exes' Windows file version.
+  WIN_FILE_VERSION:
+    sh: git describe --tags --abbrev=0 2>/dev/null | sed -n "s/^v\{0,1\}\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p" | grep . || echo 0.0.0
+  # Name of the WSL command that runs the Windows GUI (installed by install-windows).
+  WIN_WRAPPER: katTasks-win
+
+tasks:
+  default:
+    desc: Build both the CLI/TUI and the GUI
+    cmds:
+      - task: build
+      - task: build-gui
+
+  build:
+    desc: Build katTasks (CLI + TUI, no cgo)
+    env:
+      CGO_ENABLED: '0'
+    cmds:
+      - go build -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/katTasks{{.EXE}} .
+
+  build-gui:
+    desc: Build katTasks-gui (needs the wails3 CLI)
+    preconditions:
+      - sh: command -v wails3
+        msg: "wails3 not found: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0"
+    cmds:
+      - '{{.GUI_TASK}} build VERSION={{.VERSION}}'
+
+  # Cross-compiles both apps for Windows. Neither needs cgo there (the GUI
+  # uses WebView2), so no mingw toolchain is required.
+  build-windows:
+    desc: Build bin/katTasks.exe and katTasks-gui/bin/katTasks-gui.exe
+    preconditions:
+      - sh: command -v wails3
+        msg: "wails3 not found: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0"
+    cmds:
+      # The CLI gets Windows version info, a manifest and the app icon, and is
+      # stripped like the GUI. Without them Windows Defender's machine-learning
+      # check can flag a bare Go exe as a trojan and block it.
+      - mkdir -p {{.BIN_DIR}}
+      - sed "s/@VERSION@/{{.WIN_FILE_VERSION}}/g" build/windows/katTasks-info.json > {{.BIN_DIR}}/katTasks-info.json
+      - wails3 generate syso -arch amd64 -icon {{.GUI_DIR}}/build/windows/icon.ico -manifest build/windows/katTasks.exe.manifest -info {{.BIN_DIR}}/katTasks-info.json -out rsrc_windows_amd64.syso
+      - defer: rm -f rsrc_windows_amd64.syso
+      - CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -buildvcs=false -ldflags="-s -w {{.LDFLAGS}}" -o {{.BIN_DIR}}/katTasks.exe .
+      - '{{.GUI_TASK}} windows:build VERSION={{.VERSION}} ARCH=amd64'
+
+  # The installer to hand out: bin/katTasks-<version>-windows-amd64-setup.exe.
+  # It installs per user (no admin) into %LOCALAPPDATA%\Programs\katTasks:
+  # katTasks-gui.exe and katTasks.exe, a Start Menu shortcut, the folder on
+  # the user PATH, the WebView2 runtime if it's missing, and an uninstaller
+  # under Settings > Apps. Needs makensis (apt install nsis).
+  build-win-installer:
+    desc: Build the Windows installer, bin/katTasks-<version>-windows-amd64-setup.exe (needs makensis)
+    deps: [build-windows]
+    vars:
+      SETUP: '{{.BIN_DIR}}/katTasks-{{.VERSION}}-windows-amd64-setup.exe'
+    preconditions:
+      - sh: command -v makensis
+        msg: "makensis not found: sudo apt install nsis"
+    cmds:
+      # The WebView2 bootstrapper the installer runs when the runtime is missing.
+      - wails3 generate webview2bootstrapper -dir {{.GUI_DIR}}/build/windows/nsis
+      - >-
+        cd {{.GUI_DIR}}/build/windows/nsis && makensis -V2
+        -DARG_WAILS_AMD64_BINARY="{{.ROOT_DIR}}/{{.GUI_DIR}}/bin/katTasks-gui.exe"
+        -DKATTASKS_CLI="{{.ROOT_DIR}}/{{.BIN_DIR}}/katTasks.exe"
+        -DINFO_PRODUCTVERSION={{.WIN_FILE_VERSION}}
+        -DOUTFILE="{{.ROOT_DIR}}/{{.SETUP}}"
+        project.nsi
+      - echo "Built {{.SETUP}}"
+
+  dev-gui:
+    desc: Run the GUI with hot reload
+    cmds:
+      - '{{.GUI_TASK}} dev'
+
+  bindings:
+    desc: Regenerate the GUI's TypeScript bindings
+    dir: '{{.GUI_DIR}}'
+    cmds:
+      - wails3 generate bindings -f '-tags {{.GUI_TAGS}}' -ts -i -clean=true
+
+  test:
+    desc: Run all Go tests (both modules) and the GUI's frontend unit tests
+    cmds:
+      - go test ./...
+      - cd {{.GUI_DIR}} && go test -tags {{.GUI_TAGS}} ./...
+      - cd {{.GUI_DIR}}/frontend && npm test --silent
+
+  vet:
+    desc: Run go vet on both modules
+    cmds:
+      - go vet ./...
+      - cd {{.GUI_DIR}} && go vet -tags {{.GUI_TAGS}} ./...
+
+  check-frontend:
+    desc: Type-check the Svelte frontend
+    deps: [bindings]
+    dir: '{{.GUI_DIR}}/frontend'
+    cmds:
+      - npx svelte-check --tsconfig ./tsconfig.json
+
+  # In WSL this also runs install-windows, so the Windows versions and the
+  # katTasks-win wrapper stay in step with the Linux ones.
+  install:
+    desc: Install katTasks and katTasks-gui into BINDIR (default $GOPATH/bin); in WSL, the Windows versions too
+    deps: [build, build-gui]
+    cmds:
+      - install -m 755 {{.BIN_DIR}}/katTasks{{.EXE}} {{.BINDIR}}/
+      - install -m 755 {{.GUI_DIR}}/bin/katTasks-gui{{.EXE}} {{.BINDIR}}/
+      - cmd: |
+          if grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null && command -v cmd.exe >/dev/null; then
+            "{{.TASK_EXE}}" install-windows
+          fi
+        platforms: [linux]
+
+  # From WSL: copies katTasks.exe and katTasks-gui.exe to
+  # %LOCALAPPDATA%\Programs\katTasks (where the installer puts them), then
+  # build/windows/install.ps1 adds a Start Menu shortcut, puts that folder on
+  # the user PATH and points the Windows files.todo at the WSL todo.txt (only
+  # while it's still the default and empty). Also installs
+  # BINDIR/$WIN_WRAPPER to start the Windows GUI from WSL.
+  install-windows:
+    desc: From WSL, install the Windows katTasks and katTasks-gui, plus the katTasks-win wrapper
+    platforms: [linux]
+    deps: [build, build-windows]
+    vars:
+      # Windows install dir, resolved through WSL interop (empty outside WSL).
+      WIN_INSTALL_DIR:
+        sh: '{{if .WIN_INSTALL_DIR}}echo "{{.WIN_INSTALL_DIR}}"{{else}}command -v wslpath >/dev/null && d=$(cd /mnt/c 2>/dev/null; cmd.exe /c echo %LOCALAPPDATA% 2>/dev/null | tr -d "\r") && [ -n "$d" ] && echo "$(wslpath "$d")/Programs/katTasks" || true{{end}}'
+    preconditions:
+      - sh: '[ -n "{{.WIN_INSTALL_DIR}}" ]'
+        msg: "not in WSL; set WIN_INSTALL_DIR"
+    cmds:
+      - install -Dm755 {{.BIN_DIR}}/katTasks.exe "{{.WIN_INSTALL_DIR}}/katTasks.exe"
+      - install -Dm755 {{.GUI_DIR}}/bin/katTasks-gui.exe "{{.WIN_INSTALL_DIR}}/katTasks-gui.exe"
+      # The Linux todo.txt, as the Windows apps see it (\\wsl.localhost\...).
+      # PowerShell runs from C:, since it can't start in a WSL folder.
+      - cmd: |
+          todo=$("{{.ROOT_DIR}}/{{.BIN_DIR}}/katTasks" -paths | sed -n 's/^todo: //p')
+          [ -n "$todo" ] && todo=$(wslpath -w "$todo")
+          ps1=$(wslpath -w "{{.ROOT_DIR}}/{{.GUI_DIR}}/build/windows/install.ps1")
+          dir=$(wslpath -w "{{.WIN_INSTALL_DIR}}")
+          cd /mnt/c && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" -Dir "$dir" -TodoFile "$todo"
+      - sed "s|@EXE@|{{.WIN_INSTALL_DIR}}/katTasks-gui.exe|" {{.GUI_DIR}}/build/windows/katTasks-win.sh > {{.BIN_DIR}}/{{.WIN_WRAPPER}}
+      - install -m 755 {{.BIN_DIR}}/{{.WIN_WRAPPER}} {{.BINDIR}}/{{.WIN_WRAPPER}}
+
+  clean:
+    desc: Remove build output
+    cmds:
+      - rm -rf {{.BIN_DIR}} {{.GUI_DIR}}/bin

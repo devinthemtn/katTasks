@@ -23,6 +23,7 @@ func main() {
 	updateConfig := fs.Bool("updateconfig", false, "add settings missing from the settings file (e.g. new in this version) as comments, then exit")
 	makeTheme := fs.String("maketheme", "", "write the current theme to themes/`NAME`.toml next to the settings, to edit; then exit")
 	showVersion := fs.Bool("version", false, "print the version, then exit")
+	showPaths := fs.Bool("paths", false, "print the settings file, todo.txt and done.txt in use, then exit")
 	asJSON := fs.Bool("json", false, "commands print JSON")
 	force := fs.Bool("f", false, "commands don't ask before deleting")
 	fs.Usage = func() {
@@ -39,6 +40,13 @@ func main() {
 	switch {
 	case *showVersion:
 		fmt.Println("katTasks", Version())
+		return
+	case *showPaths:
+		cfg, _, _ := config.Load(*cfgPath)
+		if *todoFile != "" {
+			cfg.SetTodo(*todoFile)
+		}
+		fmt.Printf("settings: %s\ntodo: %s\ndone: %s\n", *cfgPath, cfg.Files.Todo, cfg.Files.Done)
 		return
 	case *makeConfig:
 		created, err := config.Make(*cfgPath)

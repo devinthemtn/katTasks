@@ -60,17 +60,30 @@ The app is built with [Wails 3](https://v3.wails.io) and lives in
 than katTasks itself. To build it you need Go 1.26, Node.js and npm, `task`
 and `wails3` (`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`); on
 Linux also the GTK 3 and WebKitGTK 4.1 development packages
-(`libgtk-3-dev libwebkit2gtk-4.1-dev` on Debian and Ubuntu). Then, in
-`katTasks-gui/`:
+(`libgtk-3-dev libwebkit2gtk-4.1-dev` on Debian and Ubuntu). Then, from the
+top of the repository:
 
-    task build                 # bin/katTasks-gui for this computer
-    task windows:build         # bin/katTasks-gui.exe, from any OS
-    task windows:package       # a Windows installer (needs makensis)
-    task package               # a package for this OS: AppImage/deb/rpm, .app
-    task dev                   # run with live reload while working on it
+    task install               # build both apps and install them into $(go env GOPATH)/bin
+    task                       # just build: bin/katTasks and katTasks-gui/bin/katTasks-gui
+    task build-windows         # bin/katTasks.exe and katTasks-gui/bin/katTasks-gui.exe, from any OS
+    task build-win-installer   # a Windows installer, bin/katTasks-<version>-windows-amd64-setup.exe (needs makensis)
+    task dev-gui               # run the app with live reload while working on it
+    task test                  # every Go test, and the window's key-handling tests
 
-`npm test` and `npm run check` in `katTasks-gui/frontend` test the key
-handling and type-check the window code.
+`task install` takes `BINDIR=…` to install somewhere else. In WSL it also
+installs the Windows versions (`task install-windows`):
+
+- `katTasks.exe` and `katTasks-gui.exe` go into
+  `%LOCALAPPDATA%\Programs\katTasks`, which is added to your Windows PATH;
+- a **katTasks** Start Menu shortcut, with the app's icon;
+- `katTasks-win` in `BINDIR`, which starts the Windows app from the WSL shell;
+- the Windows settings' `files.todo` is pointed at your WSL todo.txt
+  (`\\wsl.localhost\…`), so both share one task list. This only happens while
+  the Windows setting is still the default and that todo.txt is empty, so a
+  choice made on Windows is never overwritten.
+
+The Windows installer installs the same two programs, the Start Menu shortcut
+and PATH entry, per user (no admin), with an uninstaller under Settings → Apps.
 
 ## Flags
 
@@ -81,6 +94,7 @@ handling and type-check the window code.
 | `-makeconfig` | write the settings file with every default, then exit (never overwrites) |
 | `-updateconfig` | add settings your file is missing, for example ones new in this version, as commented-out lines with their explanations, then exit. Your own settings and comments are left alone |
 | `-maketheme NAME` | write the current theme to `themes/NAME.toml` to edit, then exit |
+| `-paths` | print the settings file, todo.txt and done.txt in use, then exit |
 | `-json`, `-f` | for commands: print JSON; delete without asking |
 | `-version`, `-h` | print the version / help (help includes the settings path) |
 

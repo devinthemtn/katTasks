@@ -58,7 +58,8 @@ It takes `-file`, `-config` and `-version` like `katTasks`.
 The app is built with [Wails 3](https://v3.wails.io) and lives in
 `katTasks-gui/`, as its own Go module, because Wails needs a newer Go (1.26)
 than katTasks itself. To build it you need Go 1.26, Node.js and npm, `task`
-and `wails3` (`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`); on
+and `wails3` (`CGO_ENABLED=0 go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`;
+without `CGO_ENABLED=0` it needs GTK 4 on Linux); on
 Linux also the GTK 3 and WebKitGTK 4.1 development packages
 (`libgtk-3-dev libwebkit2gtk-4.1-dev` on Debian and Ubuntu). Then, from the
 top of the repository:

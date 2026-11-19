@@ -31,20 +31,27 @@ tasks:
       - task: build
       - task: build-gui
 
+  # build and build-gui print one line each (build/step.sh shows the tools'
+  # output only if they fail), and run once per task run, so install and
+  # install-windows can both ask for them.
   build:
     desc: Build katTasks (CLI + TUI, no cgo)
+    run: once
+    silent: true
     env:
       CGO_ENABLED: '0'
     cmds:
-      - go build -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/katTasks{{.EXE}} .
+      - build/step.sh "Building katTasks {{.VERSION}}" go build -ldflags="{{.LDFLAGS}}" -o {{.BIN_DIR}}/katTasks{{.EXE}} .
 
   build-gui:
     desc: Build katTasks-gui (needs the wails3 CLI)
+    run: once
+    silent: true
     preconditions:
       - sh: command -v wails3
-        msg: "wails3 not found: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0"
+        msg: "wails3 not found: CGO_ENABLED=0 go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0"
     cmds:
-      - '{{.GUI_TASK}} build VERSION={{.VERSION}}'
+      - build/step.sh "Building katTasks-gui {{.VERSION}}" "{{.TASK_EXE}}" -d {{.GUI_DIR}} build VERSION={{.VERSION}}
 
   # Cross-compiles both apps for Windows. Neither needs cgo there (the GUI
   # uses WebView2), so no mingw toolchain is required.
@@ -52,7 +59,7 @@ tasks:
     desc: Build bin/katTasks.exe and katTasks-gui/bin/katTasks-gui.exe
     preconditions:
       - sh: command -v wails3
-        msg: "wails3 not found: go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0"
+        msg: "wails3 not found: CGO_ENABLED=0 go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0"
     cmds:
       # The CLI gets Windows version info, a manifest and the app icon, and is
       # stripped like the GUI. Without them Windows Defender's machine-learning
@@ -121,17 +128,28 @@ tasks:
       - npx svelte-check --tsconfig ./tsconfig.json
 
   # In WSL this also runs install-windows, so the Windows versions and the
-  # katTasks-win wrapper stay in step with the Linux ones.
+  # katTasks-win wrapper stay in step with the Linux ones. It ends with a
+  # list of what it installed, read back from the installed programs.
   install:
     desc: Install katTasks and katTasks-gui into BINDIR (default $GOPATH/bin); in WSL, the Windows versions too
-    deps: [build, build-gui]
+    silent: true
     cmds:
-      - install -m 755 {{.BIN_DIR}}/katTasks{{.EXE}} {{.BINDIR}}/
-      - install -m 755 {{.GUI_DIR}}/bin/katTasks-gui{{.EXE}} {{.BINDIR}}/
-      - cmd: |
-          if grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null && command -v cmd.exe >/dev/null; then
-            "{{.TASK_EXE}}" install-windows
-          fi
+      - task: build
+      - task: build-gui
+      - install -m 755 {{.BIN_DIR}}/katTasks{{.EXE}} {{.GUI_DIR}}/bin/katTasks-gui{{.EXE}} "{{.BINDIR}}/"
+      - |
+        printf '\nInstalled into %s:\n' "$(echo "{{.BINDIR}}" | sed "s|^$HOME/|~/|")"
+        for p in "katTasks:the terminal app and commands" "katTasks-gui:the desktop app"; do
+          name=${p%%:*}
+          v=$("{{.BINDIR}}/$name{{.EXE}}" -version 2>/dev/null | sed 's/^[^ ]* //')
+          printf '  %-17s %-30s %s\n' "$name" "${p#*:}" "${v:-?}"
+        done
+        case ":$PATH:" in
+          *":{{.BINDIR}}:"*) ;;
+          *) printf '\n  Note: %s is not on your PATH. Add it, e.g. in ~/.bashrc:\n    export PATH="$PATH:%s"\n' "{{.BINDIR}}" "{{.BINDIR}}" ;;
+        esac
+      - task: install-windows
+        if: grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null && command -v cmd.exe >/dev/null
         platforms: [linux]
 
   # From WSL: copies katTasks.exe and katTasks-gui.exe to
@@ -143,7 +161,7 @@ tasks:
   install-windows:
     desc: From WSL, install the Windows katTasks and katTasks-gui, plus the katTasks-win wrapper
     platforms: [linux]
-    deps: [build, build-windows]
+    silent: true
     vars:
       # Windows install dir, resolved through WSL interop (empty outside WSL).
       WIN_INSTALL_DIR:
@@ -152,18 +170,26 @@ tasks:
       - sh: '[ -n "{{.WIN_INSTALL_DIR}}" ]'
         msg: "not in WSL; set WIN_INSTALL_DIR"
     cmds:
-      - install -Dm755 {{.BIN_DIR}}/katTasks.exe "{{.WIN_INSTALL_DIR}}/katTasks.exe"
-      - install -Dm755 {{.GUI_DIR}}/bin/katTasks-gui.exe "{{.WIN_INSTALL_DIR}}/katTasks-gui.exe"
+      - task: build # for katTasks -paths below; skipped if install already built it
+      - printf '\nWindows, in %s:\n' "$(wslpath -w "{{.WIN_INSTALL_DIR}}" 2>/dev/null || echo "{{.WIN_INSTALL_DIR}}")"
+      - build/step.sh "Building katTasks.exe and katTasks-gui.exe" "{{.TASK_EXE}}" build-windows
+      - >-
+        build/step.sh "Copying them there" sh -c
+        'install -Dm755 "{{.BIN_DIR}}/katTasks.exe" "{{.WIN_INSTALL_DIR}}/katTasks.exe" &&
+        install -Dm755 "{{.GUI_DIR}}/bin/katTasks-gui.exe" "{{.WIN_INSTALL_DIR}}/katTasks-gui.exe"'
+      - printf '  %-17s %s\n' katTasks.exe "the terminal app and commands" katTasks-gui.exe "the desktop app"
       # The Linux todo.txt, as the Windows apps see it (\\wsl.localhost\...).
-      # PowerShell runs from C:, since it can't start in a WSL folder.
+      # PowerShell runs from the install folder, since it can't start in a
+      # WSL folder; it prints the Start Menu, PATH and Tasks lines.
       - cmd: |
           todo=$("{{.ROOT_DIR}}/{{.BIN_DIR}}/katTasks" -paths | sed -n 's/^todo: //p')
           [ -n "$todo" ] && todo=$(wslpath -w "$todo")
           ps1=$(wslpath -w "{{.ROOT_DIR}}/{{.GUI_DIR}}/build/windows/install.ps1")
           dir=$(wslpath -w "{{.WIN_INSTALL_DIR}}")
-          cd /mnt/c && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" -Dir "$dir" -TodoFile "$todo"
+          cd "{{.WIN_INSTALL_DIR}}" && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" -Dir "$dir" -TodoFile "$todo"
       - sed "s|@EXE@|{{.WIN_INSTALL_DIR}}/katTasks-gui.exe|" {{.GUI_DIR}}/build/windows/katTasks-win.sh > {{.BIN_DIR}}/{{.WIN_WRAPPER}}
-      - install -m 755 {{.BIN_DIR}}/{{.WIN_WRAPPER}} {{.BINDIR}}/{{.WIN_WRAPPER}}
+      - install -m 755 {{.BIN_DIR}}/{{.WIN_WRAPPER}} "{{.BINDIR}}/{{.WIN_WRAPPER}}"
+      - printf '  %-17s %s\n' "{{.WIN_WRAPPER}}" "starts the Windows desktop app from WSL (next to katTasks)"
 
   clean:
     desc: Remove build output

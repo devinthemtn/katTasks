@@ -76,6 +76,7 @@ jobs:
         run: |
           npm ci --prefix frontend
           npm test --prefix frontend
+          wails3 generate bindings -f '-tags gtk3' -clean=true -ts -i
           npm run check --prefix frontend
           go test -tags gtk3 ./...
 

@@ -172,6 +172,7 @@
     [{ text: 'due:', style: 'tag' }, { text: 'today tomorrow fri +3d +2w +1m 2026-12-01', style: 'dim' }],
     [{ text: 'rec:', style: 'tag' }, { text: '1w 3d 5b 1m 1y · rec:+1w counts from due', style: 'dim' }],
     [{ text: 'at:', style: 'tag' }, { text: '9:30 14:00 3pm · a time, for the agenda', style: 'dim' }],
+    [{ text: 'status:doing progress:40 ', style: 'tag' }, { text: 'in progress · i > < in the list', style: 'dim' }],
     [{ text: '/name ', style: 'key' }, { text: 'run a Lua script from scripts/', style: 'dim' }],
   ];
   const typingHelp = [

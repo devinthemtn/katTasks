@@ -292,3 +292,83 @@ func (m *Model) moveTask(dir int) {
 	m.mutate(func() { m.tasks[ti], m.tasks[ni] = m.tasks[ni], m.tasks[ti] })
 	m.refresh(t)
 }
+
+// openTargets are the targets that aren't done.
+func (m *Model) openTargets() []*todo.Task {
+	var ts []*todo.Task
+	for _, t := range m.targets() {
+		if !t.Done {
+			ts = append(ts, t)
+		}
+	}
+	return ts
+}
+
+// toggleDoing adds status:doing to the open targets, or removes it if they
+// all have it already.
+func (m *Model) toggleDoing() {
+	ts := m.openTargets()
+	if len(ts) == 0 {
+		return
+	}
+	defer m.endVisual()
+	stop := true
+	for _, t := range ts {
+		if s, _ := t.Status(); s != "doing" {
+			stop = false
+		}
+	}
+	if !m.mutate(func() {
+		for _, t := range ts {
+			if stop {
+				t.RemoveTag("status")
+			} else {
+				t.SetTag("status", "doing")
+			}
+		}
+	}) {
+		return
+	}
+	if stop {
+		m.setStatus("stopped %s", plural(len(ts), "task"))
+	} else {
+		m.setStatus("started %s — status:doing", plural(len(ts), "task"))
+	}
+	m.refresh(ts[0])
+}
+
+// bumpProgress moves the open targets' progress: by step percent, between 0
+// (the tag is removed) and 100. Reaching 100 doesn't complete a task.
+func (m *Model) bumpProgress(step int) {
+	ts := m.openTargets()
+	if len(ts) == 0 {
+		return
+	}
+	next := func(t *todo.Task) int {
+		p, _ := t.Progress()
+		return min(max(p+step, 0), 100)
+	}
+	changed := false
+	for _, t := range ts {
+		p, ok := t.Progress()
+		changed = changed || next(t) != p || (ok && p == 0) // progress:0 is dropped
+	}
+	if !changed {
+		return
+	}
+	var last int
+	if !m.mutate(func() {
+		for _, t := range ts {
+			last = next(t)
+			t.SetProgress(last)
+		}
+	}) {
+		return
+	}
+	if len(ts) == 1 {
+		m.setStatus("%d%% done", last)
+	} else {
+		m.setStatus("progress %+d%% on %s", step, plural(len(ts), "task"))
+	}
+	m.refresh(ts[0])
+}

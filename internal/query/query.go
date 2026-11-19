@@ -11,6 +11,9 @@
 //	            days), w, m, y
 //	due:today   due:overdue, due:none, or an exact date like due:2026-12-01
 //	pri:A       priority A; pri:A-C a range; pri:none no priority
+//	status:doing  that status: tag; status:any has one, status:none hasn't
+//	progress:50 that percent in progress:; progress:>50, progress:<50,
+//	            progress:25-75 (inclusive), progress:any, progress:none
 //	-term       any of the above, negated
 package query
 
@@ -33,6 +36,8 @@ const (
 	kDueOverdue
 	kDueNone
 	kPri
+	kStatus
+	kProgress
 )
 
 type term struct {
@@ -47,6 +52,10 @@ type term struct {
 	days int             // kDueDay: 0 today, 1 tomorrow
 
 	priLo, priHi byte // kPri; 0, 0 means no priority
+
+	status string // kStatus: lowercased; "" none, "*" any
+
+	pctLo, pctHi int // kProgress, inclusive; -1, -1 means no progress tag
 }
 
 // Query is a parsed search.
@@ -114,6 +123,16 @@ func parseTerm(t *term, s string) {
 		parseDue(t, s[4:])
 	case strings.HasPrefix(strings.ToLower(s), "pri:") && len(s) > 4:
 		parsePri(t, s[4:])
+	case strings.HasPrefix(strings.ToLower(s), "status:") && len(s) > 7:
+		t.kind, t.status = kStatus, strings.ToLower(s[7:])
+		switch t.status {
+		case "none":
+			t.status = ""
+		case "any":
+			t.status = "*"
+		}
+	case strings.HasPrefix(strings.ToLower(s), "progress:") && len(s) > 9:
+		parseProgress(t, strings.ToLower(s[9:]))
 	}
 }
 
@@ -167,6 +186,37 @@ func parsePri(t *term, v string) {
 			lo, hi = hi, lo
 		}
 		t.kind, t.priLo, t.priHi = kPri, lo, hi
+	}
+}
+
+func parseProgress(t *term, v string) {
+	lo, hi, ok := 0, 0, false
+	switch {
+	case v == "none":
+		lo, hi, ok = -1, -1, true
+	case v == "any":
+		lo, hi, ok = 0, 100, true
+	case strings.HasPrefix(v, ">"):
+		lo, ok = todo.ParsePercent(v[1:])
+		lo, hi = lo+1, 100
+	case strings.HasPrefix(v, "<"):
+		hi, ok = todo.ParsePercent(v[1:])
+		lo, hi = 0, hi-1
+	case strings.Contains(v, "-"):
+		a, b, _ := strings.Cut(v, "-")
+		var okA, okB bool
+		lo, okA = todo.ParsePercent(a)
+		hi, okB = todo.ParsePercent(b)
+		ok = okA && okB
+		if lo > hi {
+			lo, hi = hi, lo
+		}
+	default:
+		lo, ok = todo.ParsePercent(v)
+		hi = lo
+	}
+	if ok {
+		t.kind, t.pctLo, t.pctHi = kProgress, lo, hi
 	}
 }
 
@@ -237,6 +287,21 @@ func (tm term) match(t *todo.Task, line, lower string, today time.Time) bool {
 			return t.Priority == 0
 		}
 		return t.Priority >= tm.priLo && t.Priority <= tm.priHi
+	case kStatus:
+		s, ok := t.Status()
+		switch tm.status {
+		case "":
+			return !ok
+		case "*":
+			return ok
+		}
+		return ok && s == tm.status
+	case kProgress:
+		p, ok := t.Progress()
+		if tm.pctLo < 0 {
+			return !ok
+		}
+		return ok && p >= tm.pctLo && p <= tm.pctHi
 	}
 	due, ok := t.Due()
 	if !ok {
@@ -264,7 +329,7 @@ func (tm term) match(t *todo.Task, line, lower string, today time.Time) bool {
 func (q Query) Highlights(word string) bool {
 	lw := strings.ToLower(word)
 	for _, tm := range q.terms {
-		if tm.neg || tm.kind == kDueRange || tm.kind == kDueDate || tm.kind == kDueDay || tm.kind == kDueOverdue || tm.kind == kDueNone || tm.kind == kPri {
+		if tm.neg || tm.kind == kDueRange || tm.kind == kDueDate || tm.kind == kDueDay || tm.kind == kDueOverdue || tm.kind == kDueNone || tm.kind == kPri || tm.kind == kStatus || tm.kind == kProgress {
 			continue
 		}
 		switch {

@@ -164,6 +164,8 @@ keys one after the other, within 600 ms.
 | `delete` | `d` | delete (asks first) |
 | `set_priority` | `p` | then a letter; `space` clears |
 | `priority_up` / `priority_down` | `+` `=` / `-` | raise / lower priority |
+| `toggle_doing` | `i` | start / stop working on it (`status:doing`); see [In progress](#in-progress) |
+| `progress_up` / `progress_down` | `>` / `<` | progress +10% / −10% (`progress:40`) |
 | `move_down` / `move_up` | `J` / `K` | reorder a task among tasks that tie under the current sort (any task in `file` sort) |
 | `visual` | `v` | visual mode: `space` marks rows; done, delete, priority and copy then apply to all marked |
 | `select_all` | `V` | mark every task shown |
@@ -268,11 +270,36 @@ top, then its timed tasks placed down the day by time.
 | `due:today`, `due:tomorrow`, `due:2026-12-01` | due on that day |
 | `due:overdue`, `due:none` | past due and not done / no due date |
 | `pri:A`, `pri:A-C`, `pri:none` | by priority |
+| `status:doing`, `status:any`, `status:none` | by `status:` tag |
+| `progress:40`, `progress:>50`, `progress:<50`, `progress:25-75`, `progress:any`, `progress:none` | by `progress:` percent |
 | `-term` | negates any term, e.g. `-@waiting`, `-due:none` |
 
 Matching words are highlighted. `fs` saves the current search (or the selected
 project or context) to `[filters]`. Saved searches appear in the sidebar under
 SAVED and in the palette.
+
+## In progress
+
+todo.txt itself only has done and not done, so katTasks keeps the steps in
+between in two ordinary tags, which other todo.txt tools keep and ignore:
+
+| tag | meaning | shown as |
+|---|---|---|
+| `status:doing` | being worked on | `▶ doing` |
+| `status:blocked`, `status:review`, … | any other state, typed by hand | the word |
+| `progress:40` | 40% done (0–100; `progress:40%` also works) | `▰▰▱▱▱ 40%` |
+
+`i` adds or removes `status:doing`, and `>` / `<` move `progress:` up or down
+by 10% (down to 0 removes it). They work on every marked task in visual mode,
+and are one undo step. Reaching 100% doesn't complete a task; `x` does. A done
+task keeps both tags, so reopening it restores them, but the next copy of a
+`rec:` task starts without them. Search with `status:doing` or
+`progress:>50`, or save one as a sidebar search:
+
+```toml
+[filters]
+doing = "status:doing"
+```
 
 ## Recurring tasks
 

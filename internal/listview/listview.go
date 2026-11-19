@@ -361,3 +361,24 @@ func Body(t *todo.Task) string {
 	}
 	return strings.Join(out, " ")
 }
+
+// WorkLabels are the badges for an open task's status: and progress: tags:
+// "▶ doing" (or the status as written, e.g. "blocked") and a progress bar
+// such as "▰▰▱▱▱ 40%". They're empty when the tag is missing or the task is
+// done; doing says whether the status is "doing", which is drawn brighter.
+func WorkLabels(t *todo.Task) (status string, doing bool, progress string) {
+	if t.Done {
+		return "", false, ""
+	}
+	if s, ok := t.Status(); ok {
+		status, doing = s, s == "doing"
+		if doing {
+			status = "▶ doing"
+		}
+	}
+	if p, ok := t.Progress(); ok {
+		filled := p / 20 // of 5 cells; only 100% fills them all
+		progress = strings.Repeat("▰", filled) + strings.Repeat("▱", 5-filled) + fmt.Sprintf(" %d%%", p)
+	}
+	return status, doing, progress
+}

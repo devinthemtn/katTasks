@@ -84,6 +84,11 @@ type TaskRow struct {
 	Due      string `json:"due"`
 	DueStyle string `json:"dueStyle"`
 	Recur    bool   `json:"recur"`
+	// Status and Progress are the in-progress badges, e.g. "▶ doing" and
+	// "▰▰▱▱▱ 40%"; empty for none. Doing makes the status bright.
+	Status   string `json:"status"`
+	Doing    bool   `json:"doing"`
+	Progress string `json:"progress"`
 	Cursor   bool   `json:"cursor"`
 	Marked   bool   `json:"marked"`
 }
@@ -259,6 +264,7 @@ func (m Model) taskRow(t *todo.Task, hide map[string]bool, now time.Time) TaskRo
 		r.Priority = string(t.Priority)
 		r.PriStyle = priKey(t.Priority)
 	}
+	r.Status, r.Doing, r.Progress = listview.WorkLabels(t)
 	_, r.Recur = t.Recurrence()
 	r.Recur = r.Recur && !t.Done
 	d, hasDue := t.Due()
@@ -273,6 +279,8 @@ func (m Model) taskRow(t *todo.Task, hide map[string]bool, now time.Time) TaskRo
 		st := "fg"
 		switch {
 		case strings.HasPrefix(word, "due:") && hasDue:
+			continue
+		case !t.Done && todo.IsWorkTag(word): // shown as a badge
 			continue
 		case t.Done:
 			st = "done"

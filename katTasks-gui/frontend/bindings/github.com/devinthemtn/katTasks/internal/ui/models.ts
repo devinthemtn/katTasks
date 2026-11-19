@@ -360,6 +360,14 @@ export interface TaskRow {
     "due": string;
     "dueStyle": string;
     "recur": boolean;
+
+    /**
+     * Status and Progress are the in-progress badges, e.g. "▶ doing" and
+     * "▰▰▱▱▱ 40%"; empty for none. Doing makes the status bright.
+     */
+    "status": string;
+    "doing": boolean;
+    "progress": string;
     "cursor": boolean;
     "marked": boolean;
 }

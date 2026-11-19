@@ -156,3 +156,39 @@ func TestCSSFontFamily(t *testing.T) {
 		t.Errorf("custom: %s", got)
 	}
 }
+
+func TestHeadlessDoingAndProgress(t *testing.T) {
+	h, _ := headless(t) // one task, "Old task"
+	s := keys(h, "i", ">", ">", ">", ">")
+	r := s.Rows[0]
+	if r.Status != "▶ doing" || !r.Doing || r.Progress != "▰▰▱▱▱ 40%" {
+		t.Fatalf("row %+v", r)
+	}
+	for _, w := range r.Words {
+		if strings.Contains(w.Text, ":") {
+			t.Errorf("tag %q shown in the text as well as the badge", w.Text)
+		}
+	}
+	data, _ := os.ReadFile(h.m.cfg.Files.Todo)
+	if strings.TrimSpace(string(data)) != "Old task status:doing progress:40" {
+		t.Fatalf("saved %q", data)
+	}
+	if !strings.Contains(h.m.renderTask(h.m.tasks[0], row{}, 100, time.Now()), "▶ doing ▰▰▱▱▱ 40%") {
+		t.Error("terminal row has no badge")
+	}
+
+	s = keys(h, "<", "<", "<", "<", "i")
+	if r := s.Rows[0]; r.Status != "" || r.Progress != "" {
+		t.Fatalf("after stopping: %+v", r)
+	}
+	data, _ = os.ReadFile(h.m.cfg.Files.Todo)
+	if strings.TrimSpace(string(data)) != "Old task" {
+		t.Fatalf("saved %q", data)
+	}
+
+	// Done tasks keep the tags but show them as words, not badges.
+	s = keys(h, "i", ">", "x", "H") // H: completed tasks are hidden by default
+	if r := s.Rows[0]; !r.Done || r.Status != "" || r.Progress != "" || len(r.Words) != 4 {
+		t.Fatalf("done row %+v", r)
+	}
+}

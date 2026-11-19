@@ -1,6 +1,7 @@
 package query
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -83,5 +84,44 @@ func TestRelativeDayUsesMatchTime(t *testing.T) {
 	task := todo.Parse("x due:2026-11-19")
 	if !Parse("due:today").Match(task, now.AddDate(0, 0, 1)) || !Parse("due:tomorrow").Match(task, now) {
 		t.Error("due:today/tomorrow should follow the time given to Match")
+	}
+}
+
+func TestStatusProgress(t *testing.T) {
+	tasks := map[string]string{
+		"a": "draft status:doing progress:40",
+		"b": "review status:blocked",
+		"c": "ship progress:100%",
+		"d": "plain",
+		"e": "odd progress:lots",
+	}
+	cases := []struct {
+		q    string
+		want []string
+	}{
+		{"status:doing", []string{"a"}},
+		{"status:DOING", []string{"a"}},
+		{"status:any", []string{"a", "b"}},
+		{"status:none", []string{"c", "d", "e"}},
+		{"-status:doing", []string{"b", "c", "d", "e"}},
+		{"progress:40", []string{"a"}},
+		{"progress:>40", []string{"c"}},
+		{"progress:<41", []string{"a"}},
+		{"progress:30-100", []string{"a", "c"}},
+		{"progress:100-30", []string{"a", "c"}},
+		{"progress:any", []string{"a", "c"}},
+		{"progress:none", []string{"b", "d", "e"}},
+	}
+	for _, c := range cases {
+		q := Parse(c.q)
+		var got []string
+		for _, k := range []string{"a", "b", "c", "d", "e"} {
+			if q.Match(todo.Parse(tasks[k]), now) {
+				got = append(got, k)
+			}
+		}
+		if strings.Join(got, ",") != strings.Join(c.want, ",") {
+			t.Errorf("%q: got %v, want %v", c.q, got, c.want)
+		}
 	}
 }

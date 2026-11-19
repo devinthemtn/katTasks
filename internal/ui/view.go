@@ -233,8 +233,19 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 	}
 
 	badge := ""
+	status, doing, progress := listview.WorkLabels(t)
+	if status != "" {
+		st := m.st.faint
+		if doing {
+			st = m.st.due
+		}
+		badge += on(st).Render(" " + status)
+	}
+	if progress != "" {
+		badge += on(m.st.context).Render(" " + progress)
+	}
 	if _, ok := t.Recurrence(); ok && !t.Done {
-		badge = on(m.st.context).Render(" ↻")
+		badge += on(m.st.context).Render(" ↻")
 	}
 	if d, ok := t.Due(); ok {
 		label, st := m.st.dueLabel(d, now)
@@ -254,6 +265,8 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 		st := m.st.text
 		switch {
 		case strings.HasPrefix(word, "due:") && hasDue:
+			continue
+		case !t.Done && todo.IsWorkTag(word): // shown as a badge
 			continue
 		case t.Done:
 			st = m.st.done

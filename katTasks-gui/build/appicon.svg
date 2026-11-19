@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Source for appicon.png, windows/icon.ico and darwin/icons.icns.
-       The outside matches katnotes' and katdown's icons; the inside is a checklist. -->
+  <!-- Source for appicon.png, windows/icon.ico, darwin/icons.icns and the
+       darwin/dmg-file-icon files. The outside matches katdown's and katnotes'
+       icons; the inside is TD (todo), lettered like katdown's MD. -->
   <rect x="64" y="64" width="896" height="896" rx="200" ry="200" fill="#1a1b26"/>
   <g fill="none" stroke="#6d28d9" stroke-width="26" stroke-linejoin="miter">
     <!-- Cat head: round face with two pointed ears. -->
@@ -16,10 +17,10 @@
              C794 452 816 520 816 606
              C816 756 694 846 512 846 Z"/>
   </g>
-  <g fill="none" stroke="#15803d" stroke-width="30" stroke-linecap="round" stroke-linejoin="round">
-    <!-- Checklist: three boxes, the first two ticked, each with a line of text. -->
-    <path d="M340 404 H436 V500 H340 Z M340 528 H436 V624 H340 Z M340 652 H436 V748 H340 Z"/>
-    <path d="M362 454 L384 476 L416 428 M362 578 L384 600 L416 552"/>
-    <path d="M484 452 H680 M484 576 H648 M484 700 H616"/>
+  <g fill="none" stroke="#15803d" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">
+    <!-- T -->
+    <path d="M313 484 H489 M401 484 V690"/>
+    <!-- D -->
+    <path d="M561 484 V690 H600 C654 690 703 650 703 587 C703 524 654 484 600 484 Z"/>
   </g>
 </svg>

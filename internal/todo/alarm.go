@@ -6,22 +6,41 @@ import (
 	"time"
 )
 
-// AlarmLayout is an alarm: tag's value: alarm:2026-12-01T07:30. The tag
-// rings an alarm at that date and time; due: stays a plain date.
-const AlarmLayout = "2006-01-02T15:04"
+// An alarm: tag rings an alarm at a date and time: alarm:2026-12-01T0730,
+// without a colon in the time as todo.txt asks of tag values. due: stays a
+// plain date.
 
-// ParseAlarm reads an alarm: value. The hour may be one digit
-// (2026-12-01T7:30).
+// ParseAlarm reads an alarm: value: a date, T, and a time as an at: tag
+// takes it (0730, 730, 7pm; and 07:30 as written before).
 func ParseAlarm(v string) (time.Time, bool) {
-	if d, rest, ok := strings.Cut(v, "T"); ok && len(rest) == 4 {
-		v = d + "T0" + rest
+	date, clock, ok := strings.Cut(v, "T")
+	if !ok {
+		return time.Time{}, false
 	}
-	a, err := time.ParseInLocation(AlarmLayout, v, time.Local)
-	return a, err == nil
+	d, err := time.ParseInLocation(DateLayout, date, time.Local)
+	if err != nil {
+		return time.Time{}, false
+	}
+	min, ok := ParseClock(clock, true)
+	if !ok {
+		return time.Time{}, false
+	}
+	return d.Add(time.Duration(min) * time.Minute), true
 }
 
-// FormatAlarm writes an alarm: value.
-func FormatAlarm(t time.Time) string { return t.Format(AlarmLayout) }
+// FormatAlarm writes an alarm: value: 2026-12-01T0730.
+func FormatAlarm(t time.Time) string { return t.Format("2006-01-02T1504") }
+
+// IsAlarmTag reports whether word is an alarm: tag that Alarm reads, so a
+// row can show it as a badge instead.
+func IsAlarmTag(word string) bool {
+	k, v, ok := splitTag(word)
+	if !ok || k != "alarm" {
+		return false
+	}
+	_, ok = ParseAlarm(v)
+	return ok
+}
 
 // Alarm returns the task's alarm: date and time, if it has a valid one.
 func (t *Task) Alarm() (time.Time, bool) {
@@ -41,7 +60,7 @@ func (t *Task) nextAlarm(n *Task, r Recurrence, today time.Time) {
 	if !ok {
 		return
 	}
-	day := truncateDay(a)
+	day := Midnight(a)
 	if due, hasDue := t.Due(); hasDue {
 		if nd, ok := n.Due(); ok {
 			gap := int(math.Round(day.Sub(due).Hours() / 24))

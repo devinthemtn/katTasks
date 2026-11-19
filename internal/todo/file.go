@@ -2,7 +2,9 @@ package todo
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -68,9 +70,13 @@ func Save(path string, tasks []*Task) (time.Time, error) {
 	defer os.Remove(tmp.Name())
 
 	w := bufio.NewWriter(tmp)
+	eol, withBOM := lineEnding(path)
+	if withBOM {
+		w.WriteString(bom)
+	}
 	for _, t := range tasks {
-		w.WriteString(t.String())
-		w.WriteByte('\n')
+		w.WriteString(t.line())
+		w.WriteString(eol)
 	}
 	if err := w.Flush(); err != nil {
 		tmp.Close()
@@ -88,6 +94,26 @@ func Save(path string, tasks []*Task) (time.Time, error) {
 	return ModTime(path), nil
 }
 
+// lineEnding is how the file at path is written, so saving it doesn't
+// change that for other programs: with \r\n line endings if it has them
+// now (as Windows editors write it), and with the byte order mark if it
+// starts with one. A new file gets \n and no mark.
+func lineEnding(path string) (eol string, withBOM bool) {
+	eol = "\n"
+	f, err := os.Open(path)
+	if err != nil {
+		return eol, false
+	}
+	defer f.Close()
+	head := make([]byte, 64*1024)
+	n, _ := io.ReadFull(f, head)
+	head = head[:n]
+	if i := bytes.IndexByte(head, '\n'); i > 0 && head[i-1] == '\r' {
+		eol = "\r\n"
+	}
+	return eol, bytes.HasPrefix(head, []byte(bom))
+}
+
 // Append adds tasks to the end of path (used for done.txt).
 func Append(path string, tasks []*Task) error {
 	if len(tasks) == 0 {
@@ -99,7 +125,7 @@ func Append(path string, tasks []*Task) error {
 	// Make sure we start on a fresh line if the file lacks a trailing newline.
 	prefix := ""
 	if b, err := os.ReadFile(path); err == nil && len(b) > 0 && b[len(b)-1] != '\n' {
-		prefix = "\n"
+		prefix, _ = lineEnding(path)
 	}
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
@@ -107,9 +133,10 @@ func Append(path string, tasks []*Task) error {
 	}
 	var b strings.Builder
 	b.WriteString(prefix)
+	eol, _ := lineEnding(path)
 	for _, t := range tasks {
-		b.WriteString(t.String())
-		b.WriteByte('\n')
+		b.WriteString(t.line())
+		b.WriteString(eol)
 	}
 	if _, err := f.WriteString(b.String()); err != nil {
 		f.Close()

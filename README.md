@@ -13,10 +13,16 @@ katTasks [flags] COMMAND ARGS...  run one command and exit (see Command line)
 - A sidebar of projects, contexts and saved searches, each with a count of open tasks.
 - Vim-style keys, two-key chords, visual multi-select, and a command palette (`:`).
 - Every key can be rebound, and you can pick or write your own color theme.
-- A search language: `+Work due:+1w -@waiting pri:A-C`.
+- A search language: `+Work due:+1w -@waiting pri:A-C status:doing`.
 - `rec:` recurring tasks, `due:` dates you can type as `due:fri`, and archiving to `done.txt`.
+- A month calendar and a week agenda, with times of day from `at:` tags.
+- Tasks in progress (`status:doing`, `progress:40`), shown as badges in the list.
+- Alerts at a task's `at:` time and alarms that ring like an alarm clock,
+  with a background reminder for when katTasks is closed.
 - Lua scripts, run from `:` or as `/name` while typing a task.
-- todo.sh-style commands (`katTasks add …`, `katTasks ls …`, `katTasks do 3`), with `-json` output.
+- todo.sh-style commands (`katTasks add …`, `katTasks ls …`, `katTasks do 3`,
+  `katTasks alarm +5m Tea is ready`), with `-json` output.
+- A desktop app, katTasks-gui, with the same keys plus the mouse.
 
 ## Install
 
@@ -86,10 +92,13 @@ WSL it skips that and installs the Windows versions instead
 - the Windows settings' `files.todo` is pointed at your WSL todo.txt
   (`\\wsl.localhost\…`), so both share one task list. This only happens while
   the Windows setting is still the default and that todo.txt is empty, so a
-  choice made on Windows is never overwritten.
+  choice made on Windows is never overwritten;
+- a running Windows `katTasks remind` (see [Alerts](#alerts)) is stopped for
+  the copy and started again, since Windows locks a running program.
 
 The Windows installer installs the same two programs, the Start Menu shortcut
 and PATH entry, per user (no admin), with an uninstaller under Settings → Apps.
+It also starts the background reminder and sets it to start at sign-in.
 
 ## Flags
 
@@ -102,7 +111,7 @@ and PATH entry, per user (no admin), with an uninstaller under Settings → Apps
 | `-maketheme NAME` | write the current theme to `themes/NAME.toml` to edit, then exit |
 | `-paths` | print the settings file, todo.txt and done.txt in use, then exit |
 | `-json`, `-f` | for commands: print JSON; delete without asking |
-| `-version`, `-h` | print the version / help (help includes the settings path) |
+| `-version`, `-h` | print the version / help, which ends with examples and the settings path. `katTasks help` does the same. It's in color in a terminal (`NO_COLOR=1` turns that off) and plain when piped, so `katTasks -h \| less` works |
 
 ## Settings
 
@@ -200,7 +209,7 @@ keys one after the other, within 600 ms.
 | `palette` | `:` `ctrl+p` | fuzzy-search every action, and your saved searches |
 | `reload` | `r` | re-read todo.txt from disk |
 | `reload_config` | `ctrl+r` | re-read the settings |
-| `help` | `?` | all keys |
+| `help` | `?` | all keys, what to type in a task, and the tags and search terms; `j` `k`, `pgup` `pgdn`, `g` `G` scroll it when it doesn't fit |
 | `quit` | `q` | quit (`ctrl+c` always quits) |
 
 To rebind an action, put it in `[keys]`. A key you bind there stops doing its
@@ -217,12 +226,15 @@ Keys are written like `ctrl+u`, `alt+x`, `shift+tab`, `enter`, `esc`, `space`,
 `tab`, `up`, `pgdown` or `f5`.
 
 Adding (`a`) or editing a task opens a small box in the middle of the screen,
-with a reminder of the `(A)`, `+project`, `@context`, `due:` and `rec:` syntax
-underneath. While typing a task, `tab` completes `+project`, `@context`, `due:`, `rec:`
-and `at:` words (`alarm:` opens a [date and time picker](#alarms)); `at:` offers the next half hours, and times that fit what
-you've typed (`at:9` → `at:9:00`, `at:9:15`…; `at:3p` → `at:3pm`). Relative due dates are converted to `YYYY-MM-DD` when you save:
-`due:today`, `due:tomorrow`, `due:fri`, `due:+3d`, `due:+2w`, `due:+1m`. When a
-project or context is selected in the sidebar, `a` fills it in for you.
+with a reminder of the `(A)`, `+project`, `@context`, `due:`, `rec:`,
+`alarm:`, `at:` and `status:` / `progress:` syntax underneath. While typing a
+task, `tab` completes `+project`, `@context`, `due:`, `rec:` and `at:` words.
+`at:` offers the next half hours, and the times that fit what you've typed
+(`at:9` → `at:900`, `at:915`…; `at:3p` → `at:3pm`). Typing `alarm:` opens a
+[date and time picker](#alarms). Relative due dates are converted to
+`YYYY-MM-DD` when you save: `due:today`, `due:tomorrow`, `due:fri`,
+`due:+3d`, `due:+2w`, `due:+1m`. When a project or context is selected in the
+sidebar, `a` fills it in for you.
 
 ## Calendar
 
@@ -263,10 +275,12 @@ them. It follows the sidebar entry and search, like the list.
 | `c` | the calendar, on the same day (`w` there comes back) |
 | `esc`, `w` | close the agenda |
 
-A task's time is an `at:` tag (`at:14:30`, `at:9`, `at:3pm`, `at:9:15am`) or
-a time in its text, such as `Standup 9:30` or `Call mom 3pm`. In text a time
-needs minutes or am/pm, so a plain number like `4` isn't taken for one.
-`due:` stays a plain date, so other todo.txt tools still read the file.
+A task's time is an `at:` tag (`at:1430`, `at:930`, `at:9`, `at:3pm`,
+`at:915am`, and `at:14:30` as earlier versions wrote it) or a time in its
+text, such as `Standup 9:30`, `Standup 9.30` or `Call mom 3pm`. In text a
+time needs a colon, a dot or am/pm, so a plain number like `4` or `2026`
+isn't taken for one. `due:` stays a plain date, so other todo.txt tools still
+read the file.
 
 In katTasks-gui the agenda is seven columns: each day's untimed tasks at the
 top, then its timed tasks placed down the day by time.
@@ -296,8 +310,8 @@ SAVED and in the palette.
 ## Alerts
 
 A task with an `at:` tag alerts you at that time, with a desktop notification
-and a sound: `Dentist due:2026-12-01 at:14:30` on December 1, and `Standup
-at:9:30` (no `due:`) every day. Only `at:` tags count, not times written in
+and a sound: `Dentist due:2026-12-01 at:1430` on December 1, and `Standup
+at:930` (no `due:`) every day. Only `at:` tags count, not times written in
 the text. Done tasks don't alert. Set it up under `[alerts]` in the settings:
 
 ```toml
@@ -308,6 +322,11 @@ popup = true       # desktop notification
 sound = true
 sound_file = ""    # e.g. "~/sounds/bell.wav"; empty = the system's notification sound
 ```
+
+From the command line, `katTasks alert +5m Check the oven` adds a task that
+alerts in 5 minutes (it sets `due:` to that day and the `at:` time `lead`
+later), `katTasks at 3 930` gives task 3 a time, and `katTasks alerts` lists
+what's coming up in the next week.
 
 katTasks and katTasks-gui alert while they're open. For alerts when neither
 is, run the background reminder at login:
@@ -336,7 +355,7 @@ first time.
 
 An `alarm:` tag rings like an alarm clock at a date and time, for when a
 quiet notification isn't enough: `Leave for airport
-alarm:2026-12-01T05:30`. Typing `alarm:` while adding or editing a task
+alarm:2026-12-01T0530`. Typing `alarm:` while adding or editing a task
 opens a picker:
 
 | keys | |
@@ -361,6 +380,11 @@ katTasks-gui and `katTasks remind` in the background, once each, and up to
 15 minutes late after sleep. Done tasks don't ring. When a `rec:` task is
 completed, its next copy's alarm moves along with its due date.
 `katTasks remind -test-alarm` rings a sample one now.
+
+From the command line: `katTasks alarm +5m Tea is ready` adds a task that
+rings in 5 minutes, and `katTasks alarm 3 tomorrow 6:30` (or `fri 7am`,
+`2026-12-01 0730`, `in 2h`, `18:00`) gives task 3 an alarm. In `+5m`, `m` is
+minutes, not months as in `due:+1m`; `+3d` and `+2w` are days and weeks.
 
 ## In progress
 
@@ -489,9 +513,18 @@ the task list to see the numbers. Several numbers can be given as `do 2 5` or
 | `lsa [QUERY…]` (`listall`) | the same, including done.txt (numbered 0) |
 | `lsp [X or A-C]` (`listpri`) | tasks with a priority |
 | `lsprj` (`listproj`), `lsc` (`listcon`) | every project / context |
+| `start N…` / `stop N…` | set / clear `status:doing` |
+| `status N WORD` | any status, e.g. `blocked`; `none` clears it |
+| `progress N PERCENT` (`prog`) | `40`, `+10`, `-10`; `none` clears it |
+| `at N TIME` (`alert`) | time of day for the agenda and alerts: `930`, `14:30`, `3pm`; `+5m` or `in 2h` alerts that long from now, once; `none` clears it |
+| `alarm N [DATE] TIME` | an alarm: `+5m`, `in 1h30m`, `tomorrow 6:30`, `fri 7am`, `2026-12-01 0730`, or just `18:00` (the next one); `none` clears it |
+| `alert WHEN TEXT…`, `alarm WHEN TEXT…` | add a task with that alert or alarm: `katTasks alarm +5m Tea is ready` |
+| `alerts [DAYS]` (`upcoming`) | the alerts and alarms of the next DAYS days (7), soonest first |
 | `remind` | run the background reminder for alerts and alarms; `-test`, `-test-alarm`, `-install`, `-uninstall`, see [Alerts](#alerts) |
 
 ```
+$ katTasks alarm +5m Tea is ready
+$ katTasks alert in 20m Move the laundry
 $ katTasks add "Pay rent +Home due:2026-12-01 rec:+1m"
 4 2026-11-18 Pay rent +Home due:2026-12-01 rec:+1m
 TODO: 4 added.
@@ -501,8 +534,35 @@ $ katTasks -f del 4
 ```
 
 With `-json`, lists print an array of tasks
-(`n raw done priority created completed text projects contexts tags due`).
+(`n raw done priority created completed text projects contexts tags due at
+alarm status progress`); `alerts` prints `{kind, at, fires, task}`.
 Changes print `{action, tasks, added, message}`.
+
+## Your todo.txt
+
+katTasks keeps the file plain todo.txt that any other todo.txt app can read
+and edit. Everything it adds is an ordinary `key:value` tag, which other
+apps keep and ignore:
+
+| tag | meaning |
+|---|---|
+| `due:2026-12-01` | due date (relative dates you type become this) |
+| `t:2026-11-28` | threshold date, moved along by `rec:` |
+| `rec:1w`, `rec:+1m` | repeat on completion |
+| `at:1430`, `at:3pm` | time of day: agenda and alerts |
+| `alarm:2026-12-01T0730` | alarm date and time |
+| `status:doing`, `progress:40` | in progress |
+| `pri:A` | the priority of a completed task, so reopening restores it |
+
+The format doesn't allow a colon in a tag's value, so times are written
+`at:1430` and `alarm:…T0730`. Files written by earlier versions, with
+`at:14:30`, still read the same; a task's tags are rewritten in the new form
+only when you add or edit that task.
+
+Saving changes only the lines of tasks you changed: every other line is
+written back exactly as it was, spacing included. Windows line endings
+(`\r\n`) and a byte order mark at the start stay as the file had them.
+Blank lines are dropped.
 
 ## Safety
 
@@ -517,7 +577,8 @@ Releases are built by [GoReleaser](https://goreleaser.com) in GitHub Actions
 tag runs the tests, builds every platform, and publishes the release with
 archives, checksums and a changelog from the commits. The desktop app is built
 first, on Linux (x86-64 and ARM64), Windows (x86-64 and ARM64) and macOS (one
-universal `.app`), and its `katTasks-gui_…` archives go in the same release:
+universal `.app`), and its `katTasks-gui_…` archives go in the same release,
+with the Windows installer (`katTasks-<version>-windows-amd64-setup.exe`):
 
     git tag -a v0.3.0 -m "katTasks 0.3.0"
     git push origin v0.3.0

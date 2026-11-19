@@ -28,17 +28,18 @@ type Snapshot struct {
 
 	Side []SideRow `json:"side"` // the sidebar rows on screen
 
-	Rows   []TaskRow `json:"rows"`   // the task rows on screen
-	Total  int       `json:"total"`  // tasks in the list
-	Offset int       `json:"offset"` // index of Rows[0]
-	Empty  string    `json:"empty"`  // shown when the list is empty
-	NumW   int       `json:"numW"`   // width of line numbers; 0 = off
+	Rows  []TaskRow `json:"rows"`  // the task rows on screen
+	Total int       `json:"total"` // tasks in the list
+	Empty string    `json:"empty"` // shown when the list is empty
+	NumW  int       `json:"numW"`  // width of line numbers; 0 = off
 
 	Input   *Input    `json:"input"`   // the text being typed, if any
 	Confirm string    `json:"confirm"` // the y/n question, in confirm mode
 	Footer  [2][]Seg  `json:"footer"`  // the two status lines
-	Visual  bool      `json:"visual"`  // visual (multi-select) mode
-	Help    []HelpCol `json:"help"`    // the help screen, when open
+	Help    []HelpCol `json:"help"`    // the help screen's keys, when open
+	// HelpTyping and HelpTags are its WHILE TYPING and TAGS & SEARCH lines.
+	HelpTyping []string `json:"helpTyping"`
+	HelpTags   []string `json:"helpTags"`
 
 	Calendar *Calendar `json:"calendar"` // shown instead of the list, when open
 	Agenda   *Agenda   `json:"agenda"`   // the list as a week, when open
@@ -160,7 +161,7 @@ var modeNames = map[mode]string{
 func (m Model) Snapshot() Snapshot {
 	s := Snapshot{
 		Mode: modeNames[m.mode], Focus: "list", Version: m.opts.Version,
-		Total: len(m.visible), Offset: m.offset, Visual: m.visual,
+		Total:  len(m.visible),
 		PalIdx: m.palIdx, PickIdx: m.pickIdx, Theme: m.theme,
 	}
 	if m.focus == focusSidebar {
@@ -203,7 +204,7 @@ func (m Model) Snapshot() Snapshot {
 		}
 	}
 	if m.showHelp && m.mode == modeNormal {
-		s.Help = m.helpCols()
+		s.Help, s.HelpTyping, s.HelpTags = m.helpCols(), typingHelp, tagsHelp
 	}
 	if m.calendar {
 		s.Calendar = m.calendarSnapshot()
@@ -286,7 +287,7 @@ func (m Model) taskRow(t *todo.Task, hide map[string]bool, now time.Time) TaskRo
 		switch {
 		case strings.HasPrefix(word, "due:") && hasDue:
 			continue
-		case !t.Done && (todo.IsWorkTag(word) || listview.IsAlarmTag(word)): // shown as a badge
+		case !t.Done && (todo.IsWorkTag(word) || todo.IsAlarmTag(word)): // shown as a badge
 			continue
 		case t.Done:
 			st = "done"

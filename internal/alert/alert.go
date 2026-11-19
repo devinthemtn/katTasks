@@ -32,18 +32,18 @@ const keepMarkers = 48 * time.Hour
 
 // Alert is one reminder.
 type Alert struct {
-	Text   string    // the task, without its tags
-	At     time.Time // the task's at: time on its day
-	FireAt time.Time // At minus the lead
-	Alarm  bool      // an alarm: tag, rather than an at: reminder
+	Task  *todo.Task
+	Text  string    // the task, without its tags
+	At    time.Time // the task's at: time on its day
+	Alarm bool      // an alarm: tag, rather than an at: reminder
 }
 
 // Message is the notification's title and body.
 func (a Alert) Message() (title, body string) {
 	if a.Alarm {
-		return "⏰ katTasks alarm", a.At.Format("Mon Jan 2 ") + todo.FormatClock(a.At.Hour()*60+a.At.Minute()) + "  " + a.Text
+		return "⏰ katTasks alarm", a.At.Format("Mon Jan 2 ") + todo.ClockOf(a.At) + "  " + a.Text
 	}
-	return "katTasks", todo.FormatClock(a.At.Hour()*60+a.At.Minute()) + "  " + a.Text
+	return "katTasks", todo.ClockOf(a.At) + "  " + a.Text
 }
 
 // Settings say how an alert is delivered.
@@ -68,7 +68,7 @@ func SettingsOf(c config.Config) Settings {
 func AlarmSettingsOf(c config.Config) (Settings, error) {
 	s := Settings{Popup: c.Alarms.Popup, Sound: true, SoundFile: c.Alarms.SoundFile, Ring: c.Alarms.RingTime, Urgent: true}
 	if s.SoundFile == "" {
-		f, err := AlarmSoundFile()
+		f, err := alarmSoundFile()
 		if err != nil {
 			return s, err
 		}
@@ -77,61 +77,85 @@ func AlarmSettingsOf(c config.Config) (Settings, error) {
 	return s, nil
 }
 
-// Pending returns the alerts that should go off at now: open tasks with an
-// at: tag, on their due: day (or today without one), whose at: time minus
-// lead has passed by less than CatchUp. Times written loosely in a task's
-// text ("call 3pm") don't count, only at: tags.
+// Pending returns the alerts that should go off at now: those whose time
+// (the at: time minus lead) has passed by less than CatchUp.
 func Pending(tasks []*todo.Task, now time.Time, lead time.Duration) []Alert {
+	return Between(tasks, now.Add(-CatchUp), now, lead)
+}
+
+// Alarms returns the alarms that should ring at now: those whose time has
+// passed by less than CatchUp.
+func Alarms(tasks []*todo.Task, now time.Time) []Alert {
+	return AlarmsBetween(tasks, now.Add(-CatchUp), now)
+}
+
+// Between returns the at: alerts that go off after from and up to to,
+// soonest first: open tasks with an at: tag, on their due: day, or every
+// day without one, lead before the at: time. Times written loosely in a
+// task's text ("call 3pm") don't count, only at: tags.
+func Between(tasks []*todo.Task, from, to time.Time, lead time.Duration) []Alert {
 	var out []Alert
 	for _, t := range tasks {
-		if t.Done {
-			continue
-		}
 		v, ok := t.Tag("at")
-		if !ok {
+		if t.Done || !ok {
 			continue
 		}
 		min, ok := todo.ParseClock(v, true)
 		if !ok {
 			continue
 		}
-		day, ok := t.Due()
-		if !ok {
-			y, m, d := now.Date()
-			day = time.Date(y, m, d, 0, 0, 0, 0, now.Location())
+		at := func(day time.Time) time.Time { // not day+duration, which DST days put an hour off
+			return time.Date(day.Year(), day.Month(), day.Day(), min/60, min%60, 0, 0, time.Local)
 		}
-		at := time.Date(day.Year(), day.Month(), day.Day(), min/60, min%60, 0, 0, now.Location())
-		fire := at.Add(-lead)
-		if now.Before(fire) || !now.Before(fire.Add(CatchUp)) {
+		fires := func(day time.Time) bool {
+			f := at(day).Add(-lead)
+			return f.After(from) && !f.After(to)
+		}
+		if due, ok := t.Due(); ok {
+			if fires(due) {
+				out = append(out, Alert{Task: t, Text: alertText(t), At: at(due)})
+			}
 			continue
 		}
-		text := listview.Body(t)
-		if text == "" {
-			text = t.Text
+		// Every day: the days whose alert can fall in the window, including
+		// the next one when the lead reaches back over midnight.
+		last := todo.Midnight(to.Add(lead))
+		for day := todo.Midnight(from).AddDate(0, 0, -1); !day.After(last); day = day.AddDate(0, 0, 1) {
+			if fires(day) {
+				out = append(out, Alert{Task: t, Text: alertText(t), At: at(day)})
+			}
 		}
-		out = append(out, Alert{Text: text, At: at, FireAt: fire})
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	sortAlerts(out)
 	return out
 }
 
-// Alarms returns the alarms that should ring at now: open tasks whose
-// alarm: time has passed by less than CatchUp.
-func Alarms(tasks []*todo.Task, now time.Time) []Alert {
+// AlarmsBetween returns the alarms that ring after from and up to to,
+// soonest first: open tasks with an alarm: tag.
+func AlarmsBetween(tasks []*todo.Task, from, to time.Time) []Alert {
 	var out []Alert
 	for _, t := range tasks {
 		at, ok := t.Alarm()
-		if t.Done || !ok || now.Before(at) || !now.Before(at.Add(CatchUp)) {
+		if t.Done || !ok || !at.After(from) || at.After(to) {
 			continue
 		}
-		text := listview.Body(t)
-		if text == "" {
-			text = t.Text
-		}
-		out = append(out, Alert{Text: text, At: at, FireAt: at, Alarm: true})
+		out = append(out, Alert{Task: t, Text: alertText(t), At: at, Alarm: true})
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	sortAlerts(out)
 	return out
+}
+
+func sortAlerts(as []Alert) {
+	sort.SliceStable(as, func(i, j int) bool { return as[i].At.Before(as[j].At) })
+}
+
+// alertText is a task as an alert shows it: its words without tags,
+// projects or contexts, or the whole text if that leaves nothing.
+func alertText(t *todo.Task) string {
+	if s := listview.Body(t); s != "" {
+		return s
+	}
+	return t.Text
 }
 
 // MarkerDir is where sent alerts are recorded: the user cache folder plus

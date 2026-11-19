@@ -37,20 +37,15 @@ func (m *Model) openAlarmPicker() {
 	start, w := m.wordAtCursor()
 	p := &alarmPick{start: start, end: start + len([]rune(w)), fresh: strings.EqualFold(w, "alarm:")}
 	if a, ok := todo.ParseAlarm(w[len("alarm:"):]); ok {
-		p.day, p.min = midnight(a), a.Hour()*60+a.Minute()
+		p.day, p.min = todo.Midnight(a), a.Hour()*60+a.Minute()
 	} else {
 		now := time.Now()
-		p.day, p.min = midnight(now), m.cfg.Alarms.DefaultMinutes
+		p.day, p.min = todo.Midnight(now), m.cfg.Alarms.DefaultMinutes
 		if now.Hour()*60+now.Minute() >= p.min {
 			p.day = p.day.AddDate(0, 0, 1)
 		}
 	}
 	m.pick, m.sugg = p, nil
-}
-
-func midnight(t time.Time) time.Time {
-	y, mo, d := t.Date()
-	return time.Date(y, mo, d, 0, 0, 0, 0, time.Local)
 }
 
 func (p *alarmPick) when() time.Time {
@@ -89,9 +84,9 @@ func (m *Model) alarmPickerKey(k string) {
 		case "]", "pgdown":
 			p.day = addMonths(p.day, 1)
 		case "t":
-			p.day = midnight(time.Now())
+			p.day = todo.Midnight(time.Now())
 		case "T":
-			p.day = midnight(time.Now()).AddDate(0, 0, 1)
+			p.day = todo.Midnight(time.Now()).AddDate(0, 0, 1)
 		}
 		return
 	}
@@ -114,14 +109,10 @@ func (m *Model) alarmPickerKey(k string) {
 		}
 	default:
 		// Typing a time: "6:45", "645", "7pm". It's used as soon as it reads
-		// as one, so 7 then 3 then 0 goes 7:00, 7:03?, 7:30.
+		// as one, so 7, 3, 0 goes 7:00, then (73 isn't a time) 7:30.
 		if len(k) == 1 && strings.Contains("0123456789:apm", k) && len(p.typed) < 7 {
 			p.typed += k
-			v := p.typed
-			if len(v) >= 3 && !strings.ContainsAny(v, ":apm") {
-				v = v[:len(v)-2] + ":" + v[len(v)-2:]
-			}
-			if min, ok := todo.ParseClock(v, true); ok {
+			if min, ok := todo.ParseClock(p.typed, true); ok {
 				p.min = min
 			}
 		}
@@ -190,7 +181,7 @@ func untilText(t, now time.Time) string {
 	case d < 24*time.Hour:
 		return fmt.Sprintf("in %dh %dm", int(d.Hours()), int(d.Minutes())%60)
 	}
-	days := int(midnight(t).Sub(midnight(now)).Hours()/24 + 0.5)
+	days := int(todo.Midnight(t).Sub(todo.Midnight(now)).Hours()/24 + 0.5)
 	if days == 1 {
 		return "tomorrow"
 	}
@@ -235,7 +226,7 @@ func (m Model) viewAlarmPicker(w int) []string {
 				st = sel
 			case sameDay(d, now):
 				st = m.st.today
-			case d.Month() != p.day.Month() || d.Before(midnight(now)):
+			case d.Month() != p.day.Month() || d.Before(todo.Midnight(now)):
 				st = m.st.faint
 			}
 			row.WriteString(st.Render(cell))
@@ -314,7 +305,7 @@ func (m Model) alarmPickerState() *AlarmPicker {
 	}
 	for _, d := range pickGrid(p.day) {
 		ap.Days = append(ap.Days, PickDay{Day: d.Day(), InMonth: d.Month() == p.day.Month(), Today: sameDay(d, now),
-			Past: d.Before(midnight(now)), Selected: sameDay(d, p.day)})
+			Past: d.Before(todo.Midnight(now)), Selected: sameDay(d, p.day)})
 	}
 	return ap
 }

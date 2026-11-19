@@ -53,7 +53,7 @@ font_family = ""
 font_size = 14
 
 [alerts]
-# Remind you of open tasks that have an at: time (at:14:30, at:3pm), on their
+# Remind you of open tasks that have an at: time (at:1430, at:3pm), on their
 # due: day, or every day if they have no due:. katTasks, katTasks-gui and
 # katTasks remind (the background reminder; katTasks remind -install starts
 # it at login) all watch the clock, and each alert goes off only once.
@@ -70,7 +70,7 @@ sound_file = ""
 
 [alarms]
 # An alarm: tag rings like an alarm clock at a date and time:
-# alarm:2026-12-01T07:30. Typing alarm: while adding or editing a task opens
+# alarm:2026-12-01T0730. Typing alarm: while adding or editing a task opens
 # a picker for it. Alarms are sent the same way as [alerts], by katTasks,
 # katTasks-gui and katTasks remind.
 enabled = true

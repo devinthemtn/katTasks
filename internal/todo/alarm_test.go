@@ -7,17 +7,18 @@ import (
 
 func TestParseAlarm(t *testing.T) {
 	want := time.Date(2026, 12, 1, 7, 30, 0, 0, time.Local)
-	for _, v := range []string{"2026-12-01T07:30", "2026-12-01T7:30"} {
+	// The colon-free form katTasks writes, and the colon form written before.
+	for _, v := range []string{"2026-12-01T0730", "2026-12-01T730", "2026-12-01T07:30", "2026-12-01T7:30", "2026-12-01T7:30am"} {
 		if a, ok := ParseAlarm(v); !ok || !a.Equal(want) {
 			t.Errorf("%q: %v %v", v, a, ok)
 		}
 	}
-	for _, v := range []string{"7:30", "2026-12-01", "2026-12-01T25:00", "tomorrow"} {
+	for _, v := range []string{"7:30", "2026-12-01", "2026-12-01T25:00", "2026-12-01T", "tomorrow"} {
 		if _, ok := ParseAlarm(v); ok {
 			t.Errorf("%q parsed", v)
 		}
 	}
-	if FormatAlarm(want) != "2026-12-01T07:30" {
+	if FormatAlarm(want) != "2026-12-01T0730" {
 		t.Error(FormatAlarm(want))
 	}
 }
@@ -26,10 +27,11 @@ func TestNextMovesAlarm(t *testing.T) {
 	now := time.Date(2026, 12, 3, 10, 0, 0, 0, time.Local)
 	cases := map[string]string{
 		// With due: it keeps its distance from the due date (a day before).
-		"Rent due:2026-12-01 rec:+1m alarm:2026-11-30T09:00": "2026-12-31T09:00",
+		"Rent due:2026-12-01 rec:+1m alarm:2026-11-30T0900": "2026-12-31T0900",
 		// Without due: strict moves from the alarm, plain from today.
-		"Stretch rec:+1w alarm:2026-12-01T07:00":     "2026-12-08T07:00",
-		"Water plants rec:3d alarm:2026-12-01T18:15": "2026-12-06T18:15",
+		"Stretch rec:+1w alarm:2026-12-01T0700": "2026-12-08T0700",
+		// Written with a colon before; the next copy uses the new form.
+		"Water plants rec:3d alarm:2026-12-01T18:15": "2026-12-06T1815",
 	}
 	for line, want := range cases {
 		n, ok := Parse(line).Next(now)

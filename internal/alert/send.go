@@ -19,7 +19,7 @@ func Send(a Alert, s Settings) error {
 // Test sends a sample alert, for katTasks remind -test.
 func Test(s Settings) error {
 	now := time.Now()
-	return Send(Alert{Text: "This is how a katTasks reminder looks", At: now, FireAt: now}, s)
+	return Send(Alert{Text: "This is how a katTasks reminder looks", At: now}, s)
 }
 
 // run runs a command, and turns a failure into an error that includes what
@@ -60,7 +60,7 @@ func ring(d time.Duration, play func() error) error {
 // TestAlarm rings a sample alarm, for katTasks remind -test-alarm.
 func TestAlarm(s Settings) error {
 	now := time.Now()
-	return Send(Alert{Text: "This is how a katTasks alarm sounds", At: now, FireAt: now, Alarm: true}, s)
+	return Send(Alert{Text: "This is how a katTasks alarm sounds", At: now, Alarm: true}, s)
 }
 
 // first returns the first of the programs that is on the PATH.

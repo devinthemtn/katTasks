@@ -92,7 +92,25 @@
     const k = teaKey(e);
     if (k === null) return;
     e.preventDefault(); // tab, space, ctrl+r, / … belong to the task list
+    if (s?.help && scrollHelp(k)) return;
     key(k);
+  }
+
+  // The help pane scrolls with these keys when it doesn't all fit; any
+  // other key goes to the task list, which closes it.
+  let helpEl: HTMLElement | undefined = $state();
+  function scrollHelp(k: string): boolean {
+    const el = helpEl;
+    if (!el || el.scrollHeight <= el.clientHeight) return false;
+    const half = Math.max(rh, Math.floor(el.clientHeight / 2));
+    const by: Record<string, number> = {
+      j: rh, down: rh, k: -rh, up: -rh,
+      pgdown: half, ' ': half, 'ctrl+d': half, pgup: -half, 'ctrl+u': -half,
+      g: -el.scrollHeight, home: -el.scrollHeight, G: el.scrollHeight, end: el.scrollHeight,
+    };
+    if (!(k in by)) return false;
+    el.scrollBy({ top: by[k] });
+    return true;
   }
 
   let wheel = 0;
@@ -172,21 +190,10 @@
     [{ text: 'due:', style: 'tag' }, { text: 'today tomorrow fri +3d +2w +1m 2026-12-01', style: 'dim' }],
     [{ text: 'rec:', style: 'tag' }, { text: '1w 3d 5b 1m 1y · rec:+1w counts from due', style: 'dim' }],
     [{ text: 'alarm:', style: 'tag' }, { text: 'opens a date and time picker; rings like an alarm clock', style: 'dim' }],
-    [{ text: 'at:', style: 'tag' }, { text: '9:30 14:00 3pm · on its due: day, or daily; agenda + alerts', style: 'dim' }],
+    [{ text: 'at:', style: 'tag' }, { text: '930 1400 3pm · on its due: day, or daily; agenda + alerts', style: 'dim' }],
     [{ text: 'status:doing progress:40 ', style: 'tag' }, { text: 'in progress · i > < in the list', style: 'dim' }],
     [{ text: '/name ', style: 'key' }, { text: 'run a Lua script from scripts/', style: 'dim' }],
   ];
-  const typingHelp = [
-    'tab        complete +project / @context / due: / at:',
-    '↑/↓        choose suggestion',
-    'enter      save        esc  cancel',
-    'due:       today, tomorrow, mon..sun, +3d, +2w, +1m',
-    'rec:       1d 2w 1m 1y 5b (b = business days); rec:+1w = from due date',
-    'at:        9:30 14:00 3pm; on the due: day, or every day without one',
-    'alarm:     opens a picker: a date and time that rings like an alarm clock',
-    '/name      run a Lua script from scripts/ (tab, or when saving)',
-  ];
-
   onMount(() => {
     const mq = matchMedia('(prefers-color-scheme: dark)');
     const onScheme = () => (dark = mq.matches);
@@ -274,7 +281,7 @@
             <div class="line dim">katTasks -maketheme NAME copies the current theme to edit</div>
           </div>
         {:else if s.help}
-          <div class="pad scroll" onclick={() => key('esc')} role="button" tabindex="-1">
+          <div class="pad scroll" bind:this={helpEl} onclick={() => key('esc')} role="button" tabindex="-1">
             <div class="line"><span class="dim bold">KEYS</span><span class="dim">&nbsp;&nbsp;&nbsp;katTasks {s.version}</span></div>
             <div class="line">&nbsp;</div>
             <div class="helpcols">
@@ -292,9 +299,13 @@
             <div class="line">&nbsp;</div>
             <div class="line dim bold">WHILE TYPING</div>
             <div class="line">&nbsp;</div>
-            {#each typingHelp as l}<div class="line dim pre">{l}</div>{/each}
+            {#each s.helpTyping ?? [] as l}<div class="line dim pre">{l}</div>{/each}
             <div class="line">&nbsp;</div>
-            <div class="line dim">press any key to close</div>
+            <div class="line dim bold">TAGS &amp; SEARCH</div>
+            <div class="line">&nbsp;</div>
+            {#each s.helpTags ?? [] as l}<div class="line dim pre">{l}</div>{/each}
+            <div class="line">&nbsp;</div>
+            <div class="line dim">j/k ↑↓ pgup/pgdn g/G scroll · any other key closes</div>
           </div>
         {:else if s.agenda}
           <AgendaView ag={s.agenda} focused={s.focus === 'list'} onclick={(r, e) => clickTask(r, e)}

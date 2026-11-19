@@ -17,13 +17,22 @@ type Task struct {
 	Completed time.Time
 	Created   time.Time
 	Text      string // description, including +projects, @contexts and key:value tags
+
+	// The line as read, and its String() then, so a task that isn't
+	// changed is written back exactly as it was.
+	orig, origForm string
 }
+
+// bom is the byte order mark some Windows editors put at a file's start.
+const bom = "\ufeff"
 
 // Parse parses one todo.txt line. It never fails: anything it does not
 // recognise is kept verbatim in Text.
 func Parse(line string) *Task {
 	t := &Task{}
-	rest := strings.TrimRight(line, "\r\n")
+	rest := strings.TrimPrefix(strings.TrimRight(line, "\r\n"), bom)
+	t.orig = rest
+	defer func() { t.origForm = t.String() }()
 
 	if strings.HasPrefix(rest, "x ") {
 		t.Done = true
@@ -74,16 +83,29 @@ func (t *Task) String() string {
 		b.WriteString("x ")
 	}
 	if t.Priority != 0 {
-		b.WriteString("(" + string(t.Priority) + ") ")
+		b.WriteByte('(')
+		b.WriteByte(t.Priority)
+		b.WriteString(") ")
 	}
 	if t.Done && !t.Completed.IsZero() {
-		b.WriteString(t.Completed.Format(DateLayout) + " ")
+		b.WriteString(t.Completed.Format(DateLayout))
+		b.WriteByte(' ')
 	}
 	if !t.Created.IsZero() {
-		b.WriteString(t.Created.Format(DateLayout) + " ")
+		b.WriteString(t.Created.Format(DateLayout))
+		b.WriteByte(' ')
 	}
 	b.WriteString(t.Text)
-	return strings.TrimRight(b.String(), " ")
+	return strings.TrimRight(b.String(), " \t")
+}
+
+// line is the task as it goes in the file: the line it was read from if
+// it hasn't changed since, so other programs' spacing is left alone.
+func (t *Task) line() string {
+	if t.orig != "" && t.String() == t.origForm {
+		return t.orig
+	}
+	return t.String()
 }
 
 // Clone returns a copy of the task.
@@ -99,7 +121,7 @@ func (t *Task) Complete(now time.Time) {
 		return
 	}
 	t.Done = true
-	t.Completed = truncateDay(now)
+	t.Completed = Midnight(now)
 	if t.Priority != 0 {
 		t.SetTag("pri", string(t.Priority))
 		t.Priority = 0
@@ -202,28 +224,39 @@ func (t *Task) Due() (time.Time, bool) {
 	return d, true
 }
 
-func truncateDay(t time.Time) time.Time {
+// Midnight is the start of t's day, in local time.
+func Midnight(t time.Time) time.Time {
 	y, m, d := t.Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.Local)
 }
 
-// NormalizeDue rewrites relative due dates into absolute ones, so the file
-// stays valid todo.txt. Supported: today, tomorrow, mon..sun (next
-// occurrence), and +Nd / +Nw (N days or weeks from now).
-func (t *Task) NormalizeDue(now time.Time) {
-	v, ok := t.Tag("due")
-	if !ok {
-		return
+// Normalize keeps a task typed or edited by the user valid todo.txt:
+// relative due dates (today, tomorrow, mon..sun, +Nd, +Nw, +Nm) become
+// absolute, and the times in at: and alarm: tags lose their colons
+// (at:14:30 becomes at:1430), since the format doesn't allow a colon in a
+// tag's value. Tasks that aren't added or edited are never rewritten.
+func (t *Task) Normalize(now time.Time) {
+	if v, ok := t.Tag("due"); ok {
+		if d, ok := ResolveDate(v, now); ok {
+			t.SetTag("due", d.Format(DateLayout))
+		}
 	}
-	if d, ok := ResolveDate(v, now); ok {
-		t.SetTag("due", d.Format(DateLayout))
+	if v, ok := t.Tag("at"); ok && strings.Contains(v, ":") {
+		if min, ok := ParseClock(v, true); ok {
+			t.SetTag("at", clockTag(v, min))
+		}
+	}
+	if v, ok := t.Tag("alarm"); ok && strings.Contains(v, ":") {
+		if a, ok := ParseAlarm(v); ok {
+			t.SetTag("alarm", FormatAlarm(a))
+		}
 	}
 }
 
 // ResolveDate turns a relative date word into a date. Absolute dates are
 // returned unchanged.
 func ResolveDate(v string, now time.Time) (time.Time, bool) {
-	today := truncateDay(now)
+	today := Midnight(now)
 	v = strings.ToLower(v)
 	switch v {
 	case "today", "tod":
@@ -269,9 +302,9 @@ func ResolveDate(v string, now time.Time) (time.Time, bool) {
 // set and the text has none.
 func NewTask(text string, now time.Time, addCreated bool) *Task {
 	t := Parse(text)
-	t.NormalizeDue(now)
+	t.Normalize(now)
 	if addCreated && t.Created.IsZero() && !t.Done {
-		t.Created = truncateDay(now)
+		t.Created = Midnight(now)
 	}
 	return t
 }

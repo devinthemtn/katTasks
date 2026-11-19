@@ -183,12 +183,7 @@ func (m *Model) deleteTargets() {
 }
 
 func (m *Model) bumpPriority(up bool) {
-	var ts []*todo.Task
-	for _, t := range m.targets() {
-		if !t.Done {
-			ts = append(ts, t)
-		}
-	}
+	ts := m.openTargets()
 	if len(ts) == 0 {
 		return
 	}

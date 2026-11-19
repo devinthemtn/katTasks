@@ -319,11 +319,6 @@ export interface Snapshot {
     "total": number;
 
     /**
-     * index of Rows[0]
-     */
-    "offset": number;
-
-    /**
      * shown when the list is empty
      */
     "empty": string;
@@ -349,14 +344,15 @@ export interface Snapshot {
     "footer": (Seg[] | null)[];
 
     /**
-     * visual (multi-select) mode
-     */
-    "visual": boolean;
-
-    /**
-     * the help screen, when open
+     * the help screen's keys, when open
      */
     "help": HelpCol[] | null;
+
+    /**
+     * HelpTyping and HelpTags are its WHILE TYPING and TAGS & SEARCH lines.
+     */
+    "helpTyping": string[] | null;
+    "helpTags": string[] | null;
 
     /**
      * shown instead of the list, when open

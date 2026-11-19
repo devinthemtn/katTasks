@@ -93,9 +93,7 @@ func (m Model) viewBody() string {
 	} else if m.mode == modeTheme {
 		main = lipgloss.NewStyle().Padding(0, 1).Render(m.viewThemePicker())
 	} else if m.showHelp {
-		main = lipgloss.NewStyle().Padding(0, 1).Render(
-			m.st.header.Render("KEYS") + m.st.faint.Render("   katTasks "+m.opts.Version) + "\n\n" + m.fullHelp(lw-4) + "\n\n" + m.inputHelp() +
-				"\n\n" + m.st.faint.Render("press any key to close"))
+		main = lipgloss.NewStyle().Padding(0, 1).Render(m.viewHelp(lw-4, inner))
 	} else if m.agenda {
 		main = lipgloss.NewStyle().Padding(0, 1).Render(m.viewAgenda(lw-4, inner))
 	} else if m.calendar {
@@ -107,17 +105,61 @@ func (m Model) viewBody() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, side, list)
 }
 
-func (m Model) inputHelp() string {
-	return m.st.header.Render("WHILE TYPING") + "\n\n" + m.st.faint.Render(strings.Join([]string{
-		"tab        complete +project / @context / due: / at:",
+// typingHelp and tagsHelp are the help screen's text sections, shared with
+// katTasks-gui through the snapshot.
+var (
+	typingHelp = []string{
+		"tab        complete +project / @context / due: / rec: / at:",
 		"↑/↓        choose suggestion",
 		"enter      save        esc  cancel",
 		"due:       today, tomorrow, mon..sun, +3d, +2w, +1m",
 		"rec:       1d 2w 1m 1y 5b (b = business days); rec:+1w = from due date",
-		"at:        9:30 14:00 3pm; on the due: day, or every day without one",
+		"at:        930 1400 3pm; on the due: day, or every day without one",
 		"alarm:     opens a picker: a date and time that rings like an alarm clock",
 		"/name      run a Lua script from scripts/ (tab, or when saving)",
-	}, "\n"))
+	}
+	tagsHelp = []string{
+		"status:doing progress:40   in progress; i, > and < set them",
+		"at:1430                    a time: the agenda, and an alert ([alerts])",
+		"alarm:2026-12-01T0730      rings like an alarm clock ([alarms])",
+		"search     words +proj @ctx due:+1w due:overdue pri:A-C -term",
+		"           status:doing status:any progress:>50 progress:none",
+		"commands   katTasks alarm +5m Tea · katTasks alert 3 in 20m",
+		"           katTasks alerts (what's coming) · katTasks -h for all",
+		"remind     katTasks remind -test / -test-alarm checks alerts;",
+		"           -install sends them at login, with katTasks closed",
+	}
+)
+
+// helpLines is the whole help screen, w cells wide, one line each.
+func (m Model) helpLines(w int) []string {
+	section := func(title string, lines []string) string {
+		return m.st.header.Render(title) + "\n\n" + m.st.faint.Render(strings.Join(lines, "\n"))
+	}
+	s := m.st.header.Render("KEYS") + m.st.faint.Render("   katTasks "+m.opts.Version) + "\n\n" + m.fullHelp(w) +
+		"\n\n" + section("WHILE TYPING", typingHelp) + "\n\n" + section("TAGS & SEARCH", tagsHelp)
+	return strings.Split(s, "\n")
+}
+
+// viewHelp draws the help screen in h lines, from m.helpScroll on. When it
+// doesn't all fit, the last line says how to scroll.
+func (m Model) viewHelp(w, h int) string {
+	lines := m.helpLines(w)
+	footer := m.st.faint.Render("press any key to close")
+	if len(lines)+2 <= h {
+		return strings.Join(lines, "\n") + "\n\n" + footer
+	}
+	rows := max(h-1, 1)
+	top := clamp(m.helpScroll, 0, max(len(lines)-rows, 0))
+	more := "↓ more"
+	switch {
+	case top+rows >= len(lines):
+		more = "↑ the end"
+	case top > 0:
+		more = "↕ more"
+	}
+	footer = m.st.prompt.Render(more) + m.st.faint.Render(" · j/k ↑↓ pgup/pgdn g/G scroll · any other key closes")
+	return strings.Join(lines[top:min(top+rows, len(lines))], "\n") + "\n" + ansi.Truncate(footer, w, "…")
 }
 
 func (m Model) viewSidebar(w, h int) string {
@@ -275,7 +317,7 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 		switch {
 		case strings.HasPrefix(word, "due:") && hasDue:
 			continue
-		case !t.Done && (todo.IsWorkTag(word) || listview.IsAlarmTag(word)): // shown as a badge
+		case !t.Done && (todo.IsWorkTag(word) || todo.IsAlarmTag(word)): // shown as a badge
 			continue
 		case t.Done:
 			st = m.st.done
@@ -459,3 +501,33 @@ func shortLabel(name string) string {
 func widthOf(s string) int { return lipgloss.Width(s) }
 
 func truncateANSI(s string, n int) string { return ansi.Truncate(s, max(n, 0), "…") }
+
+// scrollHelp moves the help screen for a scrolling key and reports whether
+// k was one; any other key closes the help.
+func (m *Model) scrollHelp(k string) bool {
+	rows := max(m.listRows()-1, 1) // as viewHelp shows it
+	sw := m.sidebarWidth()
+	total := len(m.helpLines(m.width - sw - 4))
+	if total+2 <= m.listRows() {
+		return false // it all fits; nothing to scroll
+	}
+	last := max(total-rows, 0)
+	switch k {
+	case "j", "down":
+		m.helpScroll++
+	case "k", "up":
+		m.helpScroll--
+	case "ctrl+d", "pgdown", " ":
+		m.helpScroll += rows / 2
+	case "ctrl+u", "pgup":
+		m.helpScroll -= rows / 2
+	case "g", "home":
+		m.helpScroll = 0
+	case "G", "end":
+		m.helpScroll = last
+	default:
+		return false
+	}
+	m.helpScroll = clamp(m.helpScroll, 0, last)
+	return true
+}

@@ -111,7 +111,7 @@ func (t *Task) Next(now time.Time) (*Task, bool) {
 	if !ok {
 		return nil, false
 	}
-	today := truncateDay(now)
+	today := Midnight(now)
 	n := t.Clone()
 	n.Done, n.Completed = false, time.Time{}
 	n.RemoveTag("status") // a fresh occurrence isn't started

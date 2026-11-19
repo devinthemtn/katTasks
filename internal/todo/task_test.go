@@ -63,7 +63,7 @@ func TestNormalizeDue(t *testing.T) {
 	}
 	for in, want := range cases {
 		tk := Parse("task due:" + in)
-		tk.NormalizeDue(now)
+		tk.Normalize(now)
 		if got, _ := tk.Tag("due"); got != want {
 			t.Errorf("due:%s -> %s, want %s", in, got, want)
 		}

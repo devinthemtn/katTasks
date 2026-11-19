@@ -45,7 +45,6 @@ type sideEntry = listview.Entry
 
 const (
 	entryAll     = listview.All
-	entryDue     = listview.Due
 	entryHeader  = listview.Header
 	entryProject = listview.Project
 	entryContext = listview.Context
@@ -93,22 +92,23 @@ type Model struct {
 	statusErr  bool
 	configWarn string // settings problems, shown until fixed and reloaded
 
-	st       styles
-	themes   []theme.Theme
-	theme    string          // name of the theme in use
-	pickIdx  int             // theme picker cursor
-	pickPrev string          // theme to restore if the picker is cancelled
-	scripts  []script.Script // Lua scripts in the scripts folder
-	palItems []paletteItem
-	palShown []int // indexes into palItems that match the query, best first
-	palIdx   int
-	km       keymap
-	pending  string // first key of a chord, waiting for the second
-	chordSeq int
-	showHelp bool
-	calendar bool      // the calendar is shown instead of the task list
-	agenda   bool      // the list shows one week, by day (see agenda.go)
-	calDay   time.Time // the day chosen in the calendar
+	st         styles
+	themes     []theme.Theme
+	theme      string          // name of the theme in use
+	pickIdx    int             // theme picker cursor
+	pickPrev   string          // theme to restore if the picker is cancelled
+	scripts    []script.Script // Lua scripts in the scripts folder
+	palItems   []paletteItem
+	palShown   []int // indexes into palItems that match the query, best first
+	palIdx     int
+	km         keymap
+	pending    string // first key of a chord, waiting for the second
+	chordSeq   int
+	showHelp   bool
+	helpScroll int       // the help screen's first line, when it doesn't all fit
+	calendar   bool      // the calendar is shown instead of the task list
+	agenda     bool      // the list shows one week, by day (see agenda.go)
+	calDay     time.Time // the day chosen in the calendar
 
 	width, height int
 
@@ -472,6 +472,9 @@ func (m Model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	k := msg.String()
 
 	if m.showHelp {
+		if m.scrollHelp(k) {
+			return m, nil
+		}
 		m.showHelp = false
 		if a := m.km.single[k]; a != nil && a.name == "quit" {
 			return m, tea.Quit
@@ -718,7 +721,7 @@ func (m *Model) submitInput() {
 			return
 		}
 		nt := todo.Parse(val)
-		nt.NormalizeDue(time.Now())
+		nt.Normalize(time.Now())
 		if nt.String() == t.String() {
 			return
 		}
@@ -737,8 +740,9 @@ var keywordWords = []string{
 
 // atSuggestions are at: times for word (lowercase, starting "at:"), soonest
 // after now first. "at:" alone gives the next half hours; a partial time
-// ("at:9", "at:14:3") gives the quarter hours it could be, and one with a or
-// p in it ("at:3p") gives 12-hour times. They're written as ParseClock reads.
+// ("at:9", "at:143") gives the quarter hours it could be, and one with a or
+// p in it ("at:3p") gives 12-hour times. They're written without a colon
+// (at:930, at:1430, at:315pm), as todo.txt wants tag values.
 func atSuggestions(word string, now time.Time) []string {
 	v := strings.TrimPrefix(word, "at:")
 	step := 15
@@ -752,7 +756,7 @@ func atSuggestions(word string, now time.Time) []string {
 	for i := 0; i < 24*60/step; i++ {
 		min := (start + i*step) % (24 * 60)
 		if !twelve {
-			out = append(out, "at:"+todo.FormatClock(min))
+			out = append(out, "at:"+todo.FormatClockTag(min))
 			continue
 		}
 		h, mm, ap := min/60, min%60, "am"
@@ -765,7 +769,7 @@ func atSuggestions(word string, now time.Time) []string {
 		if mm == 0 {
 			out = append(out, fmt.Sprintf("at:%d%s", h, ap))
 		} else {
-			out = append(out, fmt.Sprintf("at:%d:%02d%s", h, mm, ap))
+			out = append(out, fmt.Sprintf("at:%d%02d%s", h, mm, ap))
 		}
 	}
 	return out
@@ -811,6 +815,8 @@ func (m *Model) updateSuggestions() {
 			return
 		}
 		pool = atSuggestions(lw, time.Now())
+		lw = strings.ReplaceAll(lw, ":", "")
+		lw = "at:" + lw[len("at"):] // "at:14:3" matches at:1430
 	case len(lw) >= 3 && (strings.HasPrefix("due:", lw) || strings.HasPrefix(lw, "due:") ||
 		strings.HasPrefix("rec:", lw) || strings.HasPrefix(lw, "rec:") ||
 		strings.HasPrefix("alarm:", lw) && !strings.HasPrefix(lw, "alarm:")):

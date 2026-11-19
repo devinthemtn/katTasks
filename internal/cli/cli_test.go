@@ -172,3 +172,138 @@ func TestJSON(t *testing.T) {
 		t.Errorf("del with -json and no -f should refuse, got %v", err)
 	}
 }
+
+func TestWorkCommands(t *testing.T) {
+	f := newFixture(t, "Write report +Work", "Call mom", "x 2026-11-17 Old")
+	f.ok("start", "1")
+	f.ok("progress", "1", "40")
+	f.ok("progress", "1", "+15%")
+	f.ok("status", "2", "Blocked")
+	if got := f.file(); !strings.Contains(got, "Write report +Work status:doing progress:55\nCall mom status:blocked\n") {
+		t.Fatalf("file:\n%s", got)
+	}
+	f.ok("stop", "1", "2")
+	f.ok("progress", "1", "none")
+	if got := f.file(); !strings.HasPrefix(got, "Write report +Work\nCall mom\n") {
+		t.Fatalf("after stop:\n%s", got)
+	}
+	if _, err := f.run("", false, false, "start", "3"); err == nil {
+		t.Error("started a done task")
+	}
+	for _, bad := range [][]string{{"progress", "1", "150"}, {"status", "1", "a:b"}, {"at", "1", "25:00"}, {"alarm", "1", "someday"}} {
+		if _, err := f.run("", false, false, bad...); !errors.Is(err, ErrUsage) {
+			t.Errorf("%v: %v", bad, err)
+		}
+	}
+}
+
+func TestAtAlarmAndAlerts(t *testing.T) {
+	f := newFixture(t, "Standup +Work", "Dentist", "Water plants")
+	f.ok("at", "1", "9:30") // written without the colon
+	f.ok("alarm", "2", "tomorrow", "7am")
+	f.ok("alarm", "3", "8:00") // before now (9:00), so tomorrow
+	got := f.file()
+	for _, want := range []string{"Standup +Work at:930\n", "Dentist alarm:2026-11-19T0700\n", "Water plants alarm:2026-11-19T0800\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("file lacks %q:\n%s", want, got)
+		}
+	}
+	f.ok("alarm", "3", "fri", "1830")
+	if !strings.Contains(f.file(), "Water plants alarm:2026-11-20T1830") {
+		t.Errorf("fri alarm:\n%s", f.file())
+	}
+
+	// The next 2 days from Wed 9:00: standup's alert at 9:20 (lead 10m) each
+	// day and the alarms, soonest first; Fri 18:30 is past the window.
+	out := f.ok("alerts", "2")
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	want := []string{"Wed Nov 18  9:20  alert  1 ", "Thu Nov 19  7:00  alarm  2 ", "Thu Nov 19  9:20  alert  1 "}
+	if len(lines) != len(want)+2 {
+		t.Fatalf("alerts:\n%s", out)
+	}
+	for i, w := range want {
+		if !strings.HasPrefix(lines[i], w) {
+			t.Errorf("line %d = %q, want %q…", i, lines[i], w)
+		}
+	}
+
+	js, err := f.run("", true, false, "ls")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ts []Task
+	if err := json.Unmarshal([]byte(js), &ts); err != nil {
+		t.Fatal(err)
+	}
+	for _, x := range ts {
+		if x.N == 1 && x.At != "9:30" {
+			t.Errorf("json at %q", x.At)
+		}
+		if x.N == 2 && !strings.HasPrefix(x.Alarm, "2026-11-19T07:00:00") {
+			t.Errorf("json alarm %q", x.Alarm)
+		}
+	}
+
+	f.ok("alarm", "2", "none")
+	f.ok("at", "1", "none")
+	if strings.Contains(f.file(), "Dentist alarm:") || strings.Contains(f.file(), "at:") {
+		t.Errorf("not cleared:\n%s", f.file())
+	}
+}
+
+func TestRelativeAlertsAndAlarms(t *testing.T) {
+	f := newFixture(t, "Standup") // now is Wed Nov 18 9:00; alerts.lead is 10m
+	f.ok("alarm", "1", "+5m")
+	if !strings.Contains(f.file(), "Standup alarm:2026-11-18T0905") {
+		t.Fatalf("alarm +5m:\n%s", f.file())
+	}
+	// An alert in 5 minutes: due today, at: lead after that, so it goes off at 9:05.
+	f.ok("alert", "1", "in", "5m")
+	if !strings.Contains(f.file(), "due:2026-11-18 at:915") {
+		t.Fatalf("alert in 5m:\n%s", f.file())
+	}
+	if out := f.ok("alerts", "1"); !strings.Contains(out, "Wed Nov 18  9:05  alert  1 ") || !strings.Contains(out, "Wed Nov 18  9:05  alarm  1 ") {
+		t.Errorf("alerts:\n%s", out)
+	}
+
+	// With text instead of a number, they add a task.
+	out := f.ok("alarm", "+1h30m", "Tea", "is", "ready")
+	if !strings.Contains(f.file(), "2026-11-18 Tea is ready alarm:2026-11-18T1030\n") || !strings.Contains(out, "2 added.") {
+		t.Fatalf("new alarm (%s):\n%s", out, f.file())
+	}
+	f.ok("alert", "+5m", "Check", "the", "oven")
+	if !strings.Contains(f.file(), "Check the oven due:2026-11-18 at:915\n") {
+		t.Fatalf("new alert:\n%s", f.file())
+	}
+	f.ok("alarm", "tomorrow", "6:30", "Wake", "up")
+	f.ok("alarm", "fri", "Gym") // a date alone rings at alarms.default_time
+	for _, want := range []string{"Wake up alarm:2026-11-19T0630", "Gym alarm:2026-11-20T0700"} {
+		if !strings.Contains(f.file(), want) {
+			t.Errorf("file lacks %q:\n%s", want, f.file())
+		}
+	}
+
+	// Late in the day the alert's at: time and due: move to tomorrow.
+	late := newFixture(t, "Lock up")
+	late.cfg.Alerts.LeadTime = 10 * time.Minute
+	if err := Run(Env{Cfg: late.cfg, Out: &bytes.Buffer{}, Now: func() time.Time { return time.Date(2026, 11, 18, 23, 55, 0, 0, time.Local) }}, []string{"alert", "1", "+1m"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(late.file(), "Lock up due:2026-11-19 at:0006") {
+		t.Errorf("across midnight:\n%s", late.file())
+	}
+
+	for _, bad := range [][]string{{"alarm", "+5m"}, {"alert", "soon", "x"}, {"alarm", "+0m", "x"}} {
+		if _, err := f.run("", false, false, bad...); !errors.Is(err, ErrUsage) {
+			t.Errorf("%v: %v", bad, err)
+		}
+	}
+}
+
+func TestShortDuration(t *testing.T) {
+	for d, want := range map[time.Duration]string{20 * time.Minute: "20m", 2 * time.Hour: "2h", 90 * time.Minute: "1h30m", 90 * time.Second: "1m30s"} {
+		if got := shortDuration(d); got != want {
+			t.Errorf("%v: %q", d, got)
+		}
+	}
+}

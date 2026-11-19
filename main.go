@@ -30,17 +30,13 @@ func main() {
 	showPaths := fs.Bool("paths", false, "print the settings file, todo.txt and done.txt in use, then exit")
 	asJSON := fs.Bool("json", false, "commands print JSON")
 	force := fs.Bool("f", false, "commands don't ask before deleting")
-	fs.Usage = func() {
-		out := fs.Output()
-		fmt.Fprintf(out, "Usage: katTasks [flags]                 open the task list\n")
-		fmt.Fprintf(out, "       katTasks [flags] COMMAND ARGS  run one command and exit\n\nFlags (before the command):\n")
-		fs.PrintDefaults()
-		fmt.Fprintf(out, "\nCommands (N is a task number, as L shows in the task list):\n%s", cli.Usage())
-		fmt.Fprintf(out, "  %-24s %s\n", "remind [-test|-test-alarm|-install|-uninstall]", "send [alerts] and ring [alarms] in the background")
-		fmt.Fprintf(out, "\nQueries for ls/lsa: words, +proj, @ctx, due:+1w, due:-3d, due:overdue, pri:A-C, -term\n")
-		fmt.Fprintf(out, "\nSettings: %s\n", *cfgPath)
+	fs.Usage = func() { printUsage(fs, *cfgPath) }
+	parseFlags(fs, os.Args[1:])
+	if fs.Arg(0) == "help" { // katTasks help, like -h
+		fs.SetOutput(os.Stdout)
+		fs.Usage()
+		return
 	}
-	flag.Parse()
 
 	switch {
 	case *showVersion:
@@ -131,7 +127,7 @@ func main() {
 
 // remind is the katTasks remind command: the background reminder.
 func remind(args []string, cfgPath, todoFile string) {
-	rf := flag.NewFlagSet("remind", flag.ExitOnError)
+	rf := flag.NewFlagSet("remind", flag.ContinueOnError)
 	test := rf.Bool("test", false, "send a sample alert now, with the [alerts] settings, then exit")
 	testAlarm := rf.Bool("test-alarm", false, "ring a sample alarm now, with the [alarms] settings, then exit")
 	install := rf.Bool("install", false, "start katTasks remind at login")
@@ -141,7 +137,7 @@ func remind(args []string, cfgPath, todoFile string) {
 			"Without a flag it runs until stopped, sending the [alerts] and ringing the\n[alarms] of %s.\n\n", cfgPath)
 		rf.PrintDefaults()
 	}
-	rf.Parse(args)
+	parseFlags(rf, args)
 
 	switch {
 	case *test:
@@ -183,6 +179,26 @@ func remind(args []string, cfgPath, todoFile string) {
 			Source: alert.FileSource(cfgPath, todoFile),
 			Logf:   func(f string, a ...any) { fmt.Fprintf(os.Stderr, "katTasks: "+f+"\n", a...) },
 		})
+	}
+}
+
+// parseFlags parses args with fs. Help asked for with -h or -help goes to
+// stdout, so it can be piped to less, and exits 0; a mistake in the flags
+// is reported on stderr with the help after it, and exits 2.
+func parseFlags(fs *flag.FlagSet, args []string) {
+	usage := fs.Usage
+	fs.Usage = func() {} // printed below, to the right place
+	fs.Init(fs.Name(), flag.ContinueOnError)
+	err := fs.Parse(args)
+	fs.Usage = usage
+	switch {
+	case errors.Is(err, flag.ErrHelp):
+		fs.SetOutput(os.Stdout)
+		usage()
+		os.Exit(0)
+	case err != nil: // flag has printed what was wrong
+		usage()
+		os.Exit(2)
 	}
 }
 

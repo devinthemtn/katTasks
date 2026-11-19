@@ -71,9 +71,9 @@ func alarmWAV() []byte {
 	return b.Bytes()
 }
 
-// AlarmSoundFile returns the built-in alarm as a file in the user cache
+// alarmSoundFile returns the built-in alarm as a file in the user cache
 // folder, writing it if it isn't there or has changed.
-func AlarmSoundFile() (string, error) {
+func alarmSoundFile() (string, error) {
 	base, err := os.UserCacheDir()
 	if err != nil {
 		base = os.TempDir()

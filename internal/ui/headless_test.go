@@ -202,10 +202,10 @@ func TestAtSuggestions(t *testing.T) {
 		now  time.Time
 		want []string
 	}{
-		{"at:", now, []string{"at:14:30", "at:15:00", "at:15:30"}},
-		{"at:", time.Date(2026, 11, 19, 23, 50, 0, 0, time.Local), []string{"at:0:00", "at:0:30"}},
-		{"at:9", now, []string{"at:14:15", "at:14:30"}}, // unfiltered; updateSuggestions filters
-		{"at:3p", now, []string{"at:2:15pm", "at:2:30pm"}},
+		{"at:", now, []string{"at:1430", "at:1500", "at:1530"}},
+		{"at:", time.Date(2026, 11, 19, 23, 50, 0, 0, time.Local), []string{"at:0000", "at:0030"}},
+		{"at:9", now, []string{"at:1415", "at:1430"}}, // unfiltered; updateSuggestions filters
+		{"at:3p", now, []string{"at:215pm", "at:230pm"}},
 	}
 	for _, c := range cases {
 		if got := firsts(c.w, c.now, len(c.want)); strings.Join(got, " ") != strings.Join(c.want, " ") {
@@ -220,20 +220,30 @@ func TestHeadlessAtCompletion(t *testing.T) {
 	for _, r := range "Lunch at:9" {
 		s = h.Key(string(r))
 	}
-	if len(s.Input.Sugg) == 0 || s.Input.Sugg[0] != "at:9:00" && !strings.HasPrefix(s.Input.Sugg[0], "at:9:") {
+	want := map[string]bool{"at:900": true, "at:915": true, "at:930": true, "at:945": true}
+	if len(s.Input.Sugg) != 4 {
 		t.Fatalf("suggestions %q", s.Input.Sugg)
 	}
 	for _, g := range s.Input.Sugg {
-		if !strings.HasPrefix(g, "at:9:") {
+		if !want[g] {
 			t.Errorf("suggestion %q doesn't fit at:9", g)
 		}
 	}
 	s = h.Key("tab")
-	if !strings.HasPrefix(s.Input.Value, "Lunch at:9:") {
-		t.Fatalf("after tab: %q", s.Input.Value)
+	got := strings.TrimSpace(strings.TrimPrefix(s.Input.Value, "Lunch at:"))
+	if strings.Contains(got, ":") {
+		t.Errorf("inserted a colon: %q", s.Input.Value)
 	}
-	if _, ok := todo.ParseClock(strings.TrimSpace(strings.TrimPrefix(s.Input.Value, "Lunch at:")), true); !ok {
-		t.Errorf("inserted time doesn't parse: %q", s.Input.Value)
+	if min, ok := todo.ParseClock(got, true); !ok || min/60 != 9 {
+		t.Errorf("inserted time doesn't parse as 9:xx: %q", s.Input.Value)
+	}
+
+	// The old colon form still finds them.
+	for _, r := range " at:14:3" {
+		s = h.Key(string(r))
+	}
+	if len(s.Input.Sugg) == 0 || s.Input.Sugg[0] != "at:1430" {
+		t.Fatalf("14:3 suggestions %q", s.Input.Sugg)
 	}
 
 	// The ones for 3p are 12-hour times that parse too.
@@ -273,7 +283,7 @@ func TestAlarmPicker(t *testing.T) {
 	}
 	s = keys(h, "up") // +15 min
 	s = h.Key("enter")
-	want := "Wake up alarm:" + start.AddDate(0, 0, 1).Format(todo.DateLayout) + "T07:00 "
+	want := "Wake up alarm:" + start.AddDate(0, 0, 1).Format(todo.DateLayout) + "T0700 "
 	if s.Input.Alarm != nil || s.Input.Value != want {
 		t.Fatalf("value %q, want %q", s.Input.Value, want)
 	}
@@ -322,7 +332,46 @@ func TestAlarmPickerClick(t *testing.T) {
 		h.Key(string(r))
 	}
 	s := h.Pick(20, true) // a day in the third week of the grid
-	if s.Input.Alarm != nil || !strings.Contains(s.Input.Value, "alarm:") || !strings.Contains(s.Input.Value, "T07:00") {
+	if s.Input.Alarm != nil || !strings.Contains(s.Input.Value, "alarm:") || !strings.Contains(s.Input.Value, "T0700") {
 		t.Fatalf("after click %q", s.Input.Value)
+	}
+}
+
+func TestHelpScrolls(t *testing.T) {
+	h, _ := headless(t)
+	h.Resize(100, 14) // too short for the help screen
+	keys(h, "?")
+	first := h.m.View()
+	if !strings.Contains(first, "↓ more") || strings.Contains(first, "TAGS & SEARCH") {
+		t.Fatalf("top of a short help screen:\n%s", first)
+	}
+	keys(h, "G")
+	if v := h.m.View(); !strings.Contains(v, "TAGS & SEARCH") || !strings.Contains(v, "the end") {
+		t.Fatalf("bottom:\n%s", v)
+	}
+	if !h.m.showHelp {
+		t.Fatal("scrolling closed the help")
+	}
+	s := keys(h, "g", "j", "k", "x") // x isn't a scroll key: it closes
+	if h.m.showHelp || s.Help != nil {
+		t.Error("x didn't close the help")
+	}
+
+	// Tall enough: everything shows and any key, j included, closes it.
+	h.Resize(200, 80)
+	keys(h, "?")
+	if v := h.m.View(); !strings.Contains(v, "TAGS & SEARCH") || strings.Contains(v, "↓ more") {
+		t.Fatalf("tall help:\n%s", v)
+	}
+	if s := keys(h, "?"); len(s.HelpTags) != 0 {
+		t.Error("? didn't close it")
+	}
+	s = keys(h, "?")
+	if len(s.HelpTyping) == 0 || len(s.HelpTags) == 0 {
+		t.Error("snapshot lacks the help text for the GUI")
+	}
+	keys(h, "j")
+	if h.m.showHelp {
+		t.Error("j didn't close a help screen that fits")
 	}
 }

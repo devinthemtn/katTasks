@@ -303,10 +303,7 @@ func Compare(mode string, a, b *todo.Task, now time.Time) int {
 }
 
 // Today is midnight at the start of now's day.
-func Today(now time.Time) time.Time {
-	y, m, d := now.Date()
-	return time.Date(y, m, d, 0, 0, 0, 0, time.Local)
-}
+func Today(now time.Time) time.Time { return todo.Midnight(now) }
 
 // DueKind says how a due date is colored.
 type DueKind string
@@ -391,9 +388,9 @@ func AlarmLabel(t *todo.Task, now time.Time) (label string, past bool) {
 	if !ok || t.Done {
 		return "", false
 	}
-	clock := todo.FormatClock(a.Hour()*60 + a.Minute())
+	clock := todo.ClockOf(a)
 	today := Today(now)
-	days := int(math.Round(time.Date(a.Year(), a.Month(), a.Day(), 0, 0, 0, 0, time.Local).Sub(today).Hours() / 24))
+	days := int(math.Round(todo.Midnight(a).Sub(today).Hours() / 24))
 	switch {
 	case days == 0:
 		label = clock
@@ -407,15 +404,4 @@ func AlarmLabel(t *todo.Task, now time.Time) (label string, past bool) {
 		label = a.Format("2006-01-02 ") + clock
 	}
 	return "⏰ " + label, a.Before(now)
-}
-
-// IsAlarmTag reports whether word is an alarm: tag that Alarm reads, so a
-// row can show it as a badge instead.
-func IsAlarmTag(word string) bool {
-	k, v, ok := strings.Cut(word, ":")
-	if !ok || k != "alarm" {
-		return false
-	}
-	_, ok = todo.ParseAlarm(v)
-	return ok
 }

@@ -43,6 +43,13 @@ var commands = []command{
 	{[]string{"depri", "dp"}, "depri N...", cmdDepri},
 	{[]string{"do", "done"}, "do N...", cmdDo},
 	{[]string{"del", "rm"}, "del N [TERM]", cmdDel},
+	{[]string{"start"}, "start N...", cmdStart},
+	{[]string{"stop"}, "stop N...", cmdStop},
+	{[]string{"status"}, "status N WORD|none", cmdStatus},
+	{[]string{"progress", "prog"}, "progress N PERCENT|none", cmdProgress},
+	{[]string{"at", "alert"}, "at N WHEN|none", cmdAt},
+	{[]string{"alarm"}, "alarm N WHEN|none", cmdAlarm},
+	{[]string{"alerts", "upcoming"}, "alerts [DAYS]", cmdAlerts},
 	{[]string{"archive"}, "archive", cmdArchive},
 	{[]string{"list", "ls"}, "ls [QUERY...]", cmdList},
 	{[]string{"listall", "lsa"}, "lsa [QUERY...]", cmdListAll},
@@ -65,17 +72,26 @@ func find(name string) *command {
 // IsCommand reports whether name is a subcommand (or alias).
 func IsCommand(name string) bool { return find(name) != nil }
 
-// Usage lists the subcommands.
-func Usage() string {
-	var b strings.Builder
+// Help is one command's usage line, and the other names it answers to.
+type Help struct {
+	Usage   string // "add TEXT..."
+	Aliases []string
+}
+
+// Commands lists the subcommands for katTasks -h.
+func Commands() []Help {
+	var out []Help
 	for _, c := range commands {
-		alias := ""
-		if len(c.names) > 1 {
-			alias = "  (" + strings.Join(c.names[1:], ", ") + ")"
+		shown, _, _ := strings.Cut(c.usage, " ")
+		h := Help{Usage: c.usage}
+		for _, n := range c.names {
+			if n != shown {
+				h.Aliases = append(h.Aliases, n)
+			}
 		}
-		fmt.Fprintf(&b, "  katTasks %s%s\n", c.usage, alias)
+		out = append(out, h)
 	}
-	return b.String()
+	return out
 }
 
 // ErrUsage is returned for bad arguments; the message says what is wrong.
@@ -160,6 +176,10 @@ type Task struct {
 	Contexts  []string          `json:"contexts"`
 	Tags      map[string]string `json:"tags"`
 	Due       string            `json:"due,omitempty"`
+	At        string            `json:"at,omitempty"`       // time of day, "14:30"
+	Alarm     string            `json:"alarm,omitempty"`    // RFC 3339
+	Status    string            `json:"status,omitempty"`   // "doing", …
+	Progress  *int              `json:"progress,omitempty"` // percent
 }
 
 func toJSON(n int, t *todo.Task) Task {
@@ -183,6 +203,18 @@ func toJSON(n int, t *todo.Task) Task {
 	}
 	if d, ok := t.Due(); ok {
 		j.Due = d.Format(todo.DateLayout)
+	}
+	if v, ok := t.Tag("at"); ok {
+		if min, ok := todo.ParseClock(v, true); ok {
+			j.At = todo.FormatClock(min)
+		}
+	}
+	if a, ok := t.Alarm(); ok {
+		j.Alarm = a.Format(time.RFC3339)
+	}
+	j.Status, _ = t.Status()
+	if p, ok := t.Progress(); ok {
+		j.Progress = &p
 	}
 	return j
 }
@@ -287,7 +319,7 @@ func cmdAppend(c *ctx, args []string) error {
 		return err
 	}
 	t.Text = strings.TrimSpace(t.Text + " " + text)
-	t.NormalizeDue(c.Now())
+	t.Normalize(c.Now())
 	if err := c.save(); err != nil {
 		return err
 	}
@@ -300,7 +332,7 @@ func cmdPrepend(c *ctx, args []string) error {
 		return err
 	}
 	t.Text = strings.TrimSpace(text + " " + t.Text)
-	t.NormalizeDue(c.Now())
+	t.Normalize(c.Now())
 	if err := c.save(); err != nil {
 		return err
 	}

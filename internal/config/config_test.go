@@ -164,3 +164,30 @@ func TestParseGUI(t *testing.T) {
 		t.Errorf("invalid: %+v %v", c.GUI, errs)
 	}
 }
+
+// The README's settings block must show every setting in default.toml.
+func TestReadmeListsSettings(t *testing.T) {
+	b, err := os.ReadFile("../../README.md")
+	if err != nil {
+		t.Skip(err)
+	}
+	readme := string(b)
+	start := strings.Index(readme, "## Settings")
+	end := strings.Index(readme[start:], "## Keys")
+	block := readme[start : start+end]
+	table := ""
+	for _, line := range strings.Split(DefaultSettingsFile, "\n") {
+		switch {
+		case strings.HasPrefix(line, "["):
+			table = strings.Trim(line, "[]")
+			if !strings.Contains(block, line) {
+				t.Errorf("README settings lack %s", line)
+			}
+		case len(line) > 0 && line[0] >= 'a' && line[0] <= 'z' && strings.Contains(line, " = "):
+			key, _, _ := strings.Cut(line, " ")
+			if !strings.Contains(block, "\n"+key+" ") {
+				t.Errorf("README settings lack %s.%s", table, key)
+			}
+		}
+	}
+}

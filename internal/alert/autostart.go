@@ -5,11 +5,10 @@ import (
 	"path/filepath"
 )
 
-// Autostart is how katTasks remind starts at login on this OS.
-//
-// Install sets it up to run exe with args (normally "remind" plus any
-// -config or -file flags) and returns a description of what it did;
-// Uninstall undoes it.
+// Each OS's autostart file has Install, which sets katTasks remind up to
+// start at login with the given arguments (normally "remind" plus any
+// -config or -file flags) and says what it did, and Uninstall, which undoes
+// it.
 
 // executable is the running program's path, symlinks resolved.
 func executable() (string, error) {

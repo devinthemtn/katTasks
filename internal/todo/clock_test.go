@@ -22,7 +22,16 @@ func TestParseClock(t *testing.T) {
 		{"24:00", false, 0, false},
 		{"13pm", false, 0, false},
 		{"9:75", false, 0, false},
-		{"2026", true, 0, false},
+		// Tag values may leave out the colon todo.txt doesn't allow there;
+		// in text a time still needs one (or a dot, or am/pm).
+		{"1430", true, 14*60 + 30, true},
+		{"930", true, 9*60 + 30, true},
+		{"0005", true, 5, true},
+		{"315pm", true, 15*60 + 15, true},
+		{"2026", true, 20*60 + 26, true},
+		{"2026", false, 0, false},
+		{"1430", false, 0, false},
+		{"2460", true, 0, false},
 		{"ten", true, 0, false},
 	} {
 		got, ok := ParseClock(c.in, c.bare)

@@ -3,6 +3,7 @@ package alert
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -51,8 +52,8 @@ func TestPending(t *testing.T) {
 		}
 	}
 	a := Pending(tasks, at(9, 20), lead)[0]
-	if !a.At.Equal(at(9, 30)) || !a.FireAt.Equal(at(9, 20)) {
-		t.Errorf("times %v %v", a.At, a.FireAt)
+	if !a.At.Equal(at(9, 30)) {
+		t.Errorf("at %v", a.At)
 	}
 	if title, body := a.Message(); title != "katTasks" || body != "9:30  Standup" {
 		t.Errorf("message %q %q", title, body)
@@ -184,5 +185,34 @@ func TestCheckRingsAlarms(t *testing.T) {
 	}
 	if b, err := os.ReadFile(got[0].SoundFile); err != nil || string(b[:4]) != "RIFF" {
 		t.Errorf("built-in alarm sound: %v", err)
+	}
+}
+
+func TestBetween(t *testing.T) {
+	tasks := parse(
+		"Standup at:930",                 // every day
+		"Dentist at:1400 due:2026-11-20", // one day
+		"Late snack at:0005",             // its alert, 10m before, is the evening before
+	)
+	lead := 10 * time.Minute
+	got := Between(tasks, at(0, 0), at(0, 0).AddDate(0, 0, 2), lead)
+	var s []string
+	for _, a := range got {
+		s = append(s, a.At.Format("Jan 2 15:04 ")+a.Text)
+	}
+	want := []string{
+		"Nov 19 09:30 Standup", "Nov 20 00:05 Late snack", "Nov 20 09:30 Standup",
+		"Nov 20 14:00 Dentist", "Nov 21 00:05 Late snack",
+	}
+	if strings.Join(s, "|") != strings.Join(want, "|") {
+		t.Errorf("got  %q\nwant %q", s, want)
+	}
+	if got[0].Task != tasks[0] {
+		t.Error("alert doesn't point at its task")
+	}
+
+	// The alert for 00:05 goes off at 23:55 the day before.
+	if p := Pending(tasks, at(23, 56), lead); len(p) != 1 || p[0].Text != "Late snack" {
+		t.Errorf("pending at 23:56: %+v", p)
 	}
 }

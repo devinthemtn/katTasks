@@ -169,7 +169,7 @@ func (m *Model) applyScriptResult(s script.Script, res script.Result, fromPalett
 	var upd *todo.Task
 	if res.Update != nil && target != nil {
 		upd = todo.Parse(*res.Update)
-		upd.NormalizeDue(now)
+		upd.Normalize(now)
 	}
 	changed := len(added) > 0 || upd != nil
 	if changed {

@@ -143,7 +143,7 @@ func defineActions() []*action {
 		}},
 		{name: "reload_config", desc: "reload settings", group: groupView, defaults: []string{"ctrl+r"}, run: func(m *Model) tea.Cmd { m.reloadConfig(); return nil }},
 		{name: "palette", desc: "command palette", group: groupView, defaults: []string{":", "ctrl+p"}, run: func(m *Model) tea.Cmd { m.openPalette(); return nil }},
-		{name: "help", desc: "help", group: groupView, defaults: []string{"?"}, run: func(m *Model) tea.Cmd { m.showHelp = true; return nil }},
+		{name: "help", desc: "help", group: groupView, defaults: []string{"?"}, run: func(m *Model) tea.Cmd { m.showHelp, m.helpScroll = true, 0; return nil }},
 		{name: "quit", desc: "quit", group: groupView, defaults: []string{"q"}, run: func(m *Model) tea.Cmd { return tea.Quit }},
 	}
 }

@@ -171,6 +171,7 @@
     [{ text: '+project ', style: 'project' }, { text: '@context ', style: 'context' }, { text: 'key:value', style: 'tag' }],
     [{ text: 'due:', style: 'tag' }, { text: 'today tomorrow fri +3d +2w +1m 2026-12-01', style: 'dim' }],
     [{ text: 'rec:', style: 'tag' }, { text: '1w 3d 5b 1m 1y · rec:+1w counts from due', style: 'dim' }],
+    [{ text: 'alarm:', style: 'tag' }, { text: 'opens a date and time picker; rings like an alarm clock', style: 'dim' }],
     [{ text: 'at:', style: 'tag' }, { text: '9:30 14:00 3pm · on its due: day, or daily; agenda + alerts', style: 'dim' }],
     [{ text: 'status:doing progress:40 ', style: 'tag' }, { text: 'in progress · i > < in the list', style: 'dim' }],
     [{ text: '/name ', style: 'key' }, { text: 'run a Lua script from scripts/', style: 'dim' }],
@@ -182,6 +183,7 @@
     'due:       today, tomorrow, mon..sun, +3d, +2w, +1m',
     'rec:       1d 2w 1m 1y 5b (b = business days); rec:+1w = from due date',
     'at:        9:30 14:00 3pm; on the due: day, or every day without one',
+    'alarm:     opens a picker: a date and time that rings like an alarm clock',
     '/name      run a Lua script from scripts/ (tab, or when saving)',
   ];
 
@@ -340,12 +342,56 @@
             {#each s.input.sugg ?? [] as g, i}<span class={i === s.input.suggIdx ? 'chip' : 'dim sugg'} onclick={() => pick(i, true)} role="button" tabindex="-1">{i === s.input.suggIdx ? g : ` ${g} `}</span>{/each}{#if s.input.suggDesc}<span class="dim">&nbsp;&nbsp;{s.input.suggDesc}</span>{/if}&nbsp;
           </div>
           <div class="rule"></div>
-          {#each popupHelp as l}<div class="line"><Text segs={l} /></div>{/each}
-          <div class="line">&nbsp;</div>
-          <div class="line">
-            <Text segs={[{ text: 'enter', style: 'key' }, { text: ' save · ', style: 'dim' }, { text: 'esc', style: 'key' }, { text: ' cancel · ', style: 'dim' },
-              { text: 'tab', style: 'key' }, { text: ' complete · ', style: 'dim' }, { text: '↑↓', style: 'key' }, { text: ' choose', style: 'dim' }]} />
-          </div>
+          {#if s.input.alarm}
+            {@const a = s.input.alarm}
+            <div class="line"><span class="prompt bold">⏰ ALARM</span>&nbsp;&nbsp;<span>{a.when}</span>&nbsp;&nbsp;<span class="dim">{a.until}</span></div>
+            <div class="line">&nbsp;</div>
+            <div class="alarm-pick">
+              <div class="alarm-cal">
+                <div class="alarm-month">
+                  <button class="dim" onclick={() => { if (a.field !== 'date') key('tab'); key('['); }} aria-label="previous month">‹</button>
+                  <span class="prompt">{a.month}</span>
+                  <button class="dim" onclick={() => { if (a.field !== 'date') key('tab'); key(']'); }} aria-label="next month">›</button>
+                </div>
+                <div class="alarm-grid">
+                  {#each a.weekdays ?? [] as w}<span class="dim">{w}</span>{/each}
+                  {#each a.days ?? [] as d, i}
+                    <span class={d.selected ? (a.field === 'date' ? 'chip' : 'sugg-on') : d.today ? 'c-today' : !d.inMonth || d.past ? 'dim' : ''}
+                      onclick={() => pick(i, false)} ondblclick={() => pick(i, true)} role="button" tabindex="-1">{d.day}</span>
+                  {/each}
+                </div>
+              </div>
+              <div class="alarm-time">
+                <div class="dim">Time</div>
+                <button class="dim" onclick={() => { if (a.field !== 'time') key('tab'); key('up'); }} aria-label="later">▲</button>
+                <span class={a.field === 'time' ? 'chip' : 'sugg-on'} onclick={() => { if (a.field !== 'time') key('tab'); }} role="button" tabindex="-1">{a.time}</span>
+                <button class="dim" onclick={() => { if (a.field !== 'time') key('tab'); key('down'); }} aria-label="earlier">▼</button>
+                {#if a.typed}<div class="dim">typed {a.typed}</div>{/if}
+              </div>
+            </div>
+            <div class="line">&nbsp;</div>
+            <div class="line">
+              {#if a.field === 'date'}
+                <Text segs={[{ text: '←→↑↓', style: 'key' }, { text: ' day · ', style: 'dim' }, { text: '[ ]', style: 'key' }, { text: ' month · ', style: 'dim' },
+                  { text: 't', style: 'key' }, { text: ' today · ', style: 'dim' }, { text: 'T', style: 'key' }, { text: ' tomorrow', style: 'dim' }]} />
+              {:else}
+                <Text segs={[{ text: '↑↓', style: 'key' }, { text: ' 15 min · ', style: 'dim' }, { text: '←→', style: 'key' }, { text: ' hour · or type ', style: 'dim' },
+                  { text: '6:45', style: 'key' }, { text: ' / ', style: 'dim' }, { text: '7pm', style: 'key' }]} />
+              {/if}
+            </div>
+            <div class="line buttons">
+              <button class="chip" onclick={() => key('enter')}>set alarm</button>
+              <button class="sugg-on" onclick={() => key('esc')}>cancel</button>
+              <span class="dim">&nbsp;tab date / time</span>
+            </div>
+          {:else}
+            {#each popupHelp as l}<div class="line"><Text segs={l} /></div>{/each}
+            <div class="line">&nbsp;</div>
+            <div class="line">
+              <Text segs={[{ text: 'enter', style: 'key' }, { text: ' save · ', style: 'dim' }, { text: 'esc', style: 'key' }, { text: ' cancel · ', style: 'dim' },
+                { text: 'tab', style: 'key' }, { text: ' complete · ', style: 'dim' }, { text: '↑↓', style: 'key' }, { text: ' choose', style: 'dim' }]} />
+            </div>
+          {/if}
         </div>
       </div>
     {/if}

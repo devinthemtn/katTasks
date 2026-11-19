@@ -68,6 +68,22 @@ sound = true
 # works everywhere; .oga and .mp3 where the system player supports them.
 sound_file = ""
 
+[alarms]
+# An alarm: tag rings like an alarm clock at a date and time:
+# alarm:2026-12-01T07:30. Typing alarm: while adding or editing a task opens
+# a picker for it. Alarms are sent the same way as [alerts], by katTasks,
+# katTasks-gui and katTasks remind.
+enabled = true
+# Show a desktop notification too.
+popup = true
+# How long the alarm rings, e.g. "10s", "30s", "2m".
+ring = "30s"
+# A sound file to ring with, played over and over. Empty uses katTasks's
+# own alarm-clock beeping. .wav works everywhere.
+sound_file = ""
+# The time the picker starts at for a new alarm.
+default_time = "7:00"
+
 [keys]
 # Rebind any action: name = "key" or ["key", "other key"]. Keys use names
 # like "ctrl+u", "enter", "space", "tab"; two plain characters such as "gg"

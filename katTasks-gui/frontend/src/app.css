@@ -219,3 +219,14 @@ button.sugg:hover { color: var(--fg); }
 .agitem.curdim { outline: 1px solid var(--border-focus); }
 .agitem.marked { background: var(--selected-bg); }
 .agitem:hover:not(.cur) { background: color-mix(in srgb, var(--cursor-bg) 70%, var(--bg)); }
+
+/* The alarm: date and time picker in the task popup. */
+.sugg-on { background: var(--selected-bg); padding: 0 1ch; }
+.alarm-pick { display: flex; gap: 4ch; align-items: flex-start; }
+.alarm-month { display: flex; justify-content: space-between; align-items: center; }
+.alarm-grid { display: grid; grid-template-columns: repeat(7, 3ch); text-align: right; }
+.alarm-grid span { padding: 0 0.5ch 0 0; cursor: pointer; }
+.alarm-grid span:hover { color: var(--accent); }
+.alarm-grid .chip, .alarm-grid .sugg-on { padding: 0 0.5ch 0 0; }
+.alarm-time { display: flex; flex-direction: column; align-items: center; gap: 0.25lh; margin-top: 1lh; }
+.alarm-time .chip, .alarm-time .sugg-on { font-size: 1.6em; padding: 0 1ch; cursor: pointer; }

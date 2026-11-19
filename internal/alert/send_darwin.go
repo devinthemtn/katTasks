@@ -17,6 +17,9 @@ display notification (item 2 of argv) with title (item 1 of argv)`
 		errs = append(errs, run("osascript", []string{"-e", script + "\nend run", title, body}, nil, ""))
 	}
 	switch {
+	case s.Sound && s.Ring > 0:
+		file := s.SoundFile
+		errs = append(errs, ring(s.Ring, func() error { return run("afplay", []string{file}, nil, "") }))
 	case s.Sound && s.SoundFile != "":
 		errs = append(errs, run("afplay", []string{s.SoundFile}, nil, ""))
 	case s.Sound && !s.Popup:

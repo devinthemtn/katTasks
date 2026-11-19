@@ -115,6 +115,7 @@ func (m Model) inputHelp() string {
 		"due:       today, tomorrow, mon..sun, +3d, +2w, +1m",
 		"rec:       1d 2w 1m 1y 5b (b = business days); rec:+1w = from due date",
 		"at:        9:30 14:00 3pm; on the due: day, or every day without one",
+		"alarm:     opens a picker: a date and time that rings like an alarm clock",
 		"/name      run a Lua script from scripts/ (tab, or when saving)",
 	}, "\n"))
 }
@@ -245,6 +246,13 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 	if progress != "" {
 		badge += on(m.st.context).Render(" " + progress)
 	}
+	if label, past := listview.AlarmLabel(t, now); label != "" {
+		st := m.st.today
+		if past {
+			st = m.st.faint
+		}
+		badge += on(st).Render(" " + label)
+	}
 	if _, ok := t.Recurrence(); ok && !t.Done {
 		badge += on(m.st.context).Render(" ↻")
 	}
@@ -267,7 +275,7 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 		switch {
 		case strings.HasPrefix(word, "due:") && hasDue:
 			continue
-		case !t.Done && todo.IsWorkTag(word): // shown as a badge
+		case !t.Done && (todo.IsWorkTag(word) || listview.IsAlarmTag(word)): // shown as a badge
 			continue
 		case t.Done:
 			st = m.st.done

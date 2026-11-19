@@ -144,5 +144,6 @@ func (t *Task) Next(now time.Time) (*Task, bool) {
 	default:
 		n.SetTag("due", r.Add(base).Format(DateLayout))
 	}
+	t.nextAlarm(n, r, today)
 	return n, true
 }

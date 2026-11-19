@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/devinthemtn/katTasks/internal/todo"
 )
 
 // AppName is the config folder name.
@@ -70,6 +72,18 @@ type Config struct {
 		// LeadTime is Lead parsed.
 		LeadTime time.Duration `toml:"-"`
 	} `toml:"alerts"`
+	Alarms struct {
+		Enabled     bool   `toml:"enabled"`
+		Popup       bool   `toml:"popup"`
+		Ring        string `toml:"ring"`
+		SoundFile   string `toml:"sound_file"`
+		DefaultTime string `toml:"default_time"`
+
+		// RingTime is Ring parsed; DefaultMinutes is DefaultTime as minutes
+		// after midnight.
+		RingTime       time.Duration `toml:"-"`
+		DefaultMinutes int           `toml:"-"`
+	} `toml:"alarms"`
 	RawKeys map[string]any    `toml:"keys"`
 	Filters map[string]string `toml:"filters"`
 
@@ -223,6 +237,21 @@ func (c *Config) normalize() []error {
 	}
 	if c.Alerts.SoundFile != "" {
 		c.Alerts.SoundFile = Expand(c.Alerts.SoundFile)
+	}
+	if d, err := time.ParseDuration(strings.TrimSpace(c.Alarms.Ring)); err != nil || d < time.Second || d > 30*time.Minute {
+		bad("alarms.ring", fmt.Sprintf("%q", c.Alarms.Ring), `want a time from "1s" to "30m", such as "30s"`)
+		c.Alarms.Ring, c.Alarms.RingTime = "30s", 30*time.Second
+	} else {
+		c.Alarms.RingTime = d
+	}
+	if c.Alarms.SoundFile != "" {
+		c.Alarms.SoundFile = Expand(c.Alarms.SoundFile)
+	}
+	if min, ok := todo.ParseClock(strings.TrimSpace(c.Alarms.DefaultTime), true); ok {
+		c.Alarms.DefaultMinutes = min
+	} else {
+		bad("alarms.default_time", fmt.Sprintf("%q", c.Alarms.DefaultTime), `want a time such as "7:00" or "6:30am"`)
+		c.Alarms.DefaultTime, c.Alarms.DefaultMinutes = "7:00", 7*60
 	}
 	for i, k := range c.View.HideKeys {
 		c.View.HideKeys[i] = strings.ToLower(strings.TrimSpace(k))

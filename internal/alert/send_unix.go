@@ -21,9 +21,12 @@ func send(title, body string, s Settings) error {
 	}
 	var errs []error
 	if s.Popup {
-		errs = append(errs, popup(title, body))
+		errs = append(errs, popup(title, body, s.Urgent))
 	}
-	if s.Sound {
+	switch {
+	case s.Sound && s.Ring > 0:
+		errs = append(errs, ring(s.Ring, func() error { return sound(s.SoundFile) }))
+	case s.Sound:
 		errs = append(errs, sound(s.SoundFile))
 	}
 	return errors.Join(errs...)
@@ -34,15 +37,21 @@ func isWSL() bool {
 	return strings.Contains(strings.ToLower(string(b)), "microsoft")
 }
 
-func popup(title, body string) error {
+// popup shows a notification; an urgent one (an alarm) stays up until it's
+// dismissed, on desktops that do that.
+func popup(title, body string, urgent bool) error {
+	urgency, hints := "normal", "{}"
+	if urgent {
+		urgency, hints = "critical", "{'urgency': <byte 2>}"
+	}
 	switch first("notify-send", "gdbus") {
 	case "notify-send":
-		return run("notify-send", []string{"-a", "katTasks", "-i", "appointment-soon", title, body}, nil, "")
+		return run("notify-send", []string{"-a", "katTasks", "-u", urgency, "-i", "appointment-soon", title, body}, nil, "")
 	case "gdbus":
 		return run("gdbus", []string{"call", "--session",
 			"--dest", "org.freedesktop.Notifications", "--object-path", "/org/freedesktop/Notifications",
 			"--method", "org.freedesktop.Notifications.Notify",
-			`"katTasks"`, "0", `"appointment-soon"`, strconv.Quote(title), strconv.Quote(body), "[]", "{}", "-1"}, nil, "")
+			`"katTasks"`, "0", `"appointment-soon"`, strconv.Quote(title), strconv.Quote(body), "[]", hints, "-1"}, nil, "")
 	}
 	return errors.New("no notify-send or gdbus for notifications (install libnotify-bin or libnotify)")
 }

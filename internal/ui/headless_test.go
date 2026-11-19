@@ -244,3 +244,85 @@ func TestHeadlessAtCompletion(t *testing.T) {
 		t.Fatalf("3p suggestions %q", s.Input.Sugg)
 	}
 }
+
+func TestAlarmPicker(t *testing.T) {
+	h, _ := headless(t)
+	s := keys(h, "a")
+	for _, r := range "Wake up alarm:" {
+		s = h.Key(string(r))
+	}
+	a := s.Input.Alarm
+	if a == nil || a.Field != "date" || len(a.Days) != 42 {
+		t.Fatalf("picker not open: %+v", s.Input)
+	}
+	start := time.Now()
+	if start.Hour()*60+start.Minute() >= 7*60 {
+		start = start.AddDate(0, 0, 1)
+	}
+	if a.Time != "7:00" || !strings.Contains(a.When, start.Format("Jan 2")) {
+		t.Fatalf("starts at %q %q", a.When, a.Time)
+	}
+	if !strings.Contains(h.m.View(), "⏰ ALARM") {
+		t.Error("terminal popup doesn't show the picker")
+	}
+
+	// Next day, then the time field: type 6:45.
+	s = keys(h, "right", "tab", "6", "4", "5")
+	if s.Input.Alarm.Field != "time" || s.Input.Alarm.Time != "6:45" {
+		t.Fatalf("time %+v", s.Input.Alarm)
+	}
+	s = keys(h, "up") // +15 min
+	s = h.Key("enter")
+	want := "Wake up alarm:" + start.AddDate(0, 0, 1).Format(todo.DateLayout) + "T07:00 "
+	if s.Input.Alarm != nil || s.Input.Value != want {
+		t.Fatalf("value %q, want %q", s.Input.Value, want)
+	}
+
+	// tab on the alarm: word opens it again where it was.
+	s = keys(h, "backspace", "tab")
+	if s.Input.Alarm == nil || s.Input.Alarm.Time != "7:00" {
+		t.Fatalf("reopen %+v", s.Input.Alarm)
+	}
+	s = h.Key("esc") // keeps the value
+	if s.Input.Alarm != nil || strings.TrimSpace(s.Input.Value) != strings.TrimSpace(want) {
+		t.Fatalf("after esc %q", s.Input.Value)
+	}
+
+	// esc on a fresh alarm: takes it back.
+	for _, r := range " alarm:" {
+		s = h.Key(string(r))
+	}
+	s = h.Key("esc")
+	if strings.Contains(strings.TrimPrefix(s.Input.Value, strings.TrimSpace(want)), "alarm:") {
+		t.Fatalf("bare alarm: left: %q", s.Input.Value)
+	}
+
+	// Saving shows the badge instead of the tag.
+	s = h.Key("enter")
+	var row *TaskRow
+	for i := range s.Rows {
+		if strings.HasPrefix(s.Rows[i].Words[0].Text, "Wake") {
+			row = &s.Rows[i]
+		}
+	}
+	if row == nil || !strings.HasPrefix(row.Alarm, "⏰ ") || !strings.HasSuffix(row.Alarm, "7:00") {
+		t.Fatalf("row %+v", row)
+	}
+	for _, w := range row.Words {
+		if strings.HasPrefix(w.Text, "alarm:") {
+			t.Error("alarm: tag shown as text too")
+		}
+	}
+}
+
+func TestAlarmPickerClick(t *testing.T) {
+	h, _ := headless(t)
+	keys(h, "a")
+	for _, r := range "x alarm:" {
+		h.Key(string(r))
+	}
+	s := h.Pick(20, true) // a day in the third week of the grid
+	if s.Input.Alarm != nil || !strings.Contains(s.Input.Value, "alarm:") || !strings.Contains(s.Input.Value, "T07:00") {
+		t.Fatalf("after click %q", s.Input.Value)
+	}
+}

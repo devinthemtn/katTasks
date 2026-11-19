@@ -59,6 +59,43 @@ export interface AgendaItem {
 }
 
 /**
+ * AlarmPicker is the picker as data, for katTasks-gui.
+ */
+export interface AlarmPicker {
+    /**
+     * "Tue Dec 1, 2026  7:30"
+     */
+    "when": string;
+
+    /**
+     * "in 2h 15m"
+     */
+    "until": string;
+
+    /**
+     * "December 2026"
+     */
+    "month": string;
+    "weekdays": string[] | null;
+
+    /**
+     * six weeks, Sunday first
+     */
+    "days": PickDay[] | null;
+
+    /**
+     * "7:30"
+     */
+    "time": string;
+    "typed": string;
+
+    /**
+     * "date" or "time"
+     */
+    "field": string;
+}
+
+/**
  * Calendar is the calendar as data, for katTasks-gui.
  */
 export interface Calendar {
@@ -180,6 +217,11 @@ export interface Input {
      */
     "suggDesc": string;
     "hint": string;
+
+    /**
+     * Alarm is the alarm: date and time picker, when it's open.
+     */
+    "alarm": AlarmPicker | null;
 }
 
 /**
@@ -190,6 +232,17 @@ export interface PaletteRow {
     "desc": string;
     "keys": string;
     "disabled": boolean;
+}
+
+/**
+ * PickDay is one day of the picker's grid.
+ */
+export interface PickDay {
+    "day": number;
+    "inMonth": boolean;
+    "today": boolean;
+    "past": boolean;
+    "selected": boolean;
 }
 
 /**
@@ -368,6 +421,12 @@ export interface TaskRow {
     "status": string;
     "doing": boolean;
     "progress": string;
+
+    /**
+     * Alarm is the alarm: badge, "⏰ tomorrow 7:30"; AlarmPast once it rang.
+     */
+    "alarm": string;
+    "alarmPast": boolean;
     "cursor": boolean;
     "marked": boolean;
 }

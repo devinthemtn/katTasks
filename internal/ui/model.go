@@ -84,6 +84,7 @@ type Model struct {
 	input     textinput.Model
 	editing   *todo.Task
 	sugg      []string
+	pick      *alarmPick // the alarm: date and time picker, over the task popup
 	suggIdx   int
 	confirm   string
 	onConfirm func(*Model)
@@ -432,7 +433,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return mdl, tea.Batch(cmds...)
 		}
 		switch m.mode {
-		case modeAdd, modeEdit, modeFilter, modeSaveName:
+		case modeAdd, modeEdit:
+			if m.pick != nil {
+				m.alarmPickerKey(msg.String())
+				return m, nil
+			}
+			return m.updateInput(msg)
+		case modeFilter, modeSaveName:
 			return m.updateInput(msg)
 		case modePalette:
 			return m.updatePalette(msg)
@@ -648,6 +655,10 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.acceptSuggestion()
 			return m, nil
 		}
+		if _, w := m.wordAtCursor(); (m.mode == modeAdd || m.mode == modeEdit) && isAlarmWord(w) {
+			m.openAlarmPicker() // change an alarm: already typed
+			return m, nil
+		}
 	case "down", "ctrl+n":
 		if len(m.sugg) > 0 {
 			m.suggIdx = (m.suggIdx + 1) % len(m.sugg)
@@ -661,6 +672,10 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
+	if _, w := m.wordAtCursor(); (m.mode == modeAdd || m.mode == modeEdit) && strings.EqualFold(w, "alarm:") && msg.String() == ":" {
+		m.openAlarmPicker()
+		return m, cmd
+	}
 	m.updateSuggestions()
 	if m.mode == modeFilter {
 		m.filter = m.input.Value()
@@ -716,6 +731,7 @@ func (m *Model) submitInput() {
 
 var keywordWords = []string{
 	"due:today", "due:tomorrow", "due:mon", "due:tue", "due:wed", "due:thu", "due:fri", "due:sat", "due:sun", "due:+1w", "due:+1m",
+	"alarm:",
 	"rec:1d", "rec:1b", "rec:1w", "rec:2w", "rec:1m", "rec:1y", "rec:+1w", "rec:+1m", "rec:+1y",
 }
 
@@ -796,7 +812,8 @@ func (m *Model) updateSuggestions() {
 		}
 		pool = atSuggestions(lw, time.Now())
 	case len(lw) >= 3 && (strings.HasPrefix("due:", lw) || strings.HasPrefix(lw, "due:") ||
-		strings.HasPrefix("rec:", lw) || strings.HasPrefix(lw, "rec:")):
+		strings.HasPrefix("rec:", lw) || strings.HasPrefix(lw, "rec:") ||
+		strings.HasPrefix("alarm:", lw) && !strings.HasPrefix(lw, "alarm:")):
 		if m.mode == modeFilter {
 			return
 		}
@@ -829,6 +846,12 @@ func (m *Model) acceptSuggestion() {
 			m.runInlineScript(sc, start, end)
 		}
 		m.updateSuggestions()
+		return
+	}
+	if s == "alarm:" { // completing to alarm: opens the picker
+		m.input.SetValue(string(val[:start]) + s + string(val[end:]))
+		m.input.SetCursor(start + len([]rune(s)))
+		m.openAlarmPicker()
 		return
 	}
 	rest := val[end:]

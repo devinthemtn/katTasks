@@ -241,7 +241,7 @@ func (h *Headless) Run(name string) Snapshot {
 }
 
 // Pick chooses row index of the open list: a command palette entry, a
-// theme, a completion or a calendar day. With commit it also runs, saves,
+// theme, a completion, a calendar day or an alarm picker day. With commit it also runs, saves,
 // accepts or opens it.
 func (h *Headless) Pick(index int, commit bool) Snapshot {
 	return h.do(func(m *Model) tea.Cmd {
@@ -251,6 +251,12 @@ func (h *Headless) Pick(index int, commit bool) Snapshot {
 		case m.mode == modeTheme && index >= 0 && index < len(m.themes):
 			m.pickIdx = index
 			m.useTheme(m.themes[index].Name)
+		case (m.mode == modeAdd || m.mode == modeEdit) && m.pick != nil:
+			m.pickDay(index) // a day of the alarm picker; commit sets it
+			if commit {
+				m.closeAlarmPicker(true)
+			}
+			return nil
 		case m.mode == modeNormal && m.calendar && !m.showHelp:
 			m.status = ""
 			m.calendarPick(index, commit)

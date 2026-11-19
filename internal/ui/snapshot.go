@@ -89,8 +89,11 @@ type TaskRow struct {
 	Status   string `json:"status"`
 	Doing    bool   `json:"doing"`
 	Progress string `json:"progress"`
-	Cursor   bool   `json:"cursor"`
-	Marked   bool   `json:"marked"`
+	// Alarm is the alarm: badge, "⏰ tomorrow 7:30"; AlarmPast once it rang.
+	Alarm     string `json:"alarm"`
+	AlarmPast bool   `json:"alarmPast"`
+	Cursor    bool   `json:"cursor"`
+	Marked    bool   `json:"marked"`
 }
 
 // Word is one word of a task, with its theme color and whether it matches
@@ -110,6 +113,8 @@ type Input struct {
 	SuggIdx  int      `json:"suggIdx"`
 	SuggDesc string   `json:"suggDesc"` // what the chosen /script does
 	Hint     string   `json:"hint"`
+	// Alarm is the alarm: date and time picker, when it's open.
+	Alarm *AlarmPicker `json:"alarm"`
 }
 
 // HelpCol is a column of the help screen.
@@ -265,6 +270,7 @@ func (m Model) taskRow(t *todo.Task, hide map[string]bool, now time.Time) TaskRo
 		r.PriStyle = priKey(t.Priority)
 	}
 	r.Status, r.Doing, r.Progress = listview.WorkLabels(t)
+	r.Alarm, r.AlarmPast = listview.AlarmLabel(t, now)
 	_, r.Recur = t.Recurrence()
 	r.Recur = r.Recur && !t.Done
 	d, hasDue := t.Due()
@@ -280,7 +286,7 @@ func (m Model) taskRow(t *todo.Task, hide map[string]bool, now time.Time) TaskRo
 		switch {
 		case strings.HasPrefix(word, "due:") && hasDue:
 			continue
-		case !t.Done && todo.IsWorkTag(word): // shown as a badge
+		case !t.Done && (todo.IsWorkTag(word) || listview.IsAlarmTag(word)): // shown as a badge
 			continue
 		case t.Done:
 			st = "done"
@@ -328,7 +334,7 @@ func dueKey(k listview.DueKind) string {
 }
 
 func (m Model) inputState() *Input {
-	in := &Input{Value: m.input.Value(), Pos: m.input.Position(), SuggIdx: m.suggIdx}
+	in := &Input{Value: m.input.Value(), Pos: m.input.Position(), SuggIdx: m.suggIdx, Alarm: m.alarmPickerState()}
 	switch m.mode {
 	case modeAdd:
 		in.Label = "New task"

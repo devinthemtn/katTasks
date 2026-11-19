@@ -135,3 +135,54 @@ func TestCheckSendsOnceAndPrunes(t *testing.T) {
 		t.Fatalf("sent while disabled: %q", sent)
 	}
 }
+
+func TestAlarms(t *testing.T) {
+	tasks := parse(
+		"Wake up alarm:2026-11-19T07:30",
+		"x 2026-11-18 Done alarm:2026-11-19T07:30",
+		"Bad alarm:tomorrow",
+		"Tomorrow alarm:2026-11-20T07:30",
+	)
+	for now, want := range map[time.Time]int{at(7, 29): 0, at(7, 30): 1, at(7, 44): 1, at(7, 45): 0} {
+		got := Alarms(tasks, now)
+		if len(got) != want {
+			t.Errorf("%s: %d alarms, want %d", now.Format("15:04"), len(got), want)
+		}
+		if len(got) == 1 && (!got[0].Alarm || got[0].Text != "Wake up") {
+			t.Errorf("alarm %+v", got[0])
+		}
+	}
+	// An alarm and an at: alert at the same time are separate markers.
+	dir := t.TempDir()
+	a := Alert{Text: "Wake up", At: at(7, 30)}
+	Claim(dir, a)
+	a.Alarm = true
+	if ok, _ := Claim(dir, a); !ok {
+		t.Error("the alarm was taken for the at: alert")
+	}
+}
+
+func TestCheckRingsAlarms(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(dir, "cache")) // for the built-in sound
+	todoPath := filepath.Join(dir, "todo.txt")
+	cfgPath := filepath.Join(dir, "config.toml")
+	os.WriteFile(todoPath, []byte("Wake up alarm:2026-11-19T07:30\n"), 0o644)
+	os.WriteFile(cfgPath, []byte("[files]\ntodo = "+config.String(todoPath)+"\n[alarms]\nring = \"5s\"\n"), 0o644)
+	var got []Settings
+	o := Options{
+		Source: FileSource(cfgPath, ""),
+		Send:   func(a Alert, s Settings) error { got = append(got, s); return nil },
+		Dir:    filepath.Join(dir, "markers"),
+		Now:    func() time.Time { return at(7, 31) },
+	}
+	if err := o.Check(); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].Ring != 5*time.Second || !got[0].Urgent || got[0].SoundFile == "" {
+		t.Fatalf("settings %+v", got)
+	}
+	if b, err := os.ReadFile(got[0].SoundFile); err != nil || string(b[:4]) != "RIFF" {
+		t.Errorf("built-in alarm sound: %v", err)
+	}
+}

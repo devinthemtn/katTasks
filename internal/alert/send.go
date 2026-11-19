@@ -43,6 +43,26 @@ func run(name string, args []string, env []string, dir string) error {
 	return nil
 }
 
+// ring plays a sound with play over and over until d has passed (at least
+// once), for alarms.
+func ring(d time.Duration, play func() error) error {
+	end := time.Now().Add(d)
+	for {
+		if err := play(); err != nil {
+			return err
+		}
+		if !time.Now().Before(end) {
+			return nil
+		}
+	}
+}
+
+// TestAlarm rings a sample alarm, for katTasks remind -test-alarm.
+func TestAlarm(s Settings) error {
+	now := time.Now()
+	return Send(Alert{Text: "This is how a katTasks alarm sounds", At: now, FireAt: now, Alarm: true}, s)
+}
+
 // first returns the first of the programs that is on the PATH.
 func first(names ...string) string {
 	for _, n := range names {

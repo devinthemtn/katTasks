@@ -35,10 +35,14 @@ type Alert struct {
 	Text   string    // the task, without its tags
 	At     time.Time // the task's at: time on its day
 	FireAt time.Time // At minus the lead
+	Alarm  bool      // an alarm: tag, rather than an at: reminder
 }
 
 // Message is the notification's title and body.
 func (a Alert) Message() (title, body string) {
+	if a.Alarm {
+		return "⏰ katTasks alarm", a.At.Format("Mon Jan 2 ") + todo.FormatClock(a.At.Hour()*60+a.At.Minute()) + "  " + a.Text
+	}
 	return "katTasks", todo.FormatClock(a.At.Hour()*60+a.At.Minute()) + "  " + a.Text
 }
 
@@ -47,11 +51,30 @@ type Settings struct {
 	Popup     bool
 	Sound     bool
 	SoundFile string // empty: the system's notification sound
+
+	// Ring, for alarms, plays SoundFile over and over for this long.
+	Ring time.Duration
+	// Urgent asks the desktop to keep the notification up (alarms).
+	Urgent bool
 }
 
-// SettingsOf reads them from the config.
+// SettingsOf reads the [alerts] settings.
 func SettingsOf(c config.Config) Settings {
 	return Settings{Popup: c.Alerts.Popup, Sound: c.Alerts.Sound, SoundFile: c.Alerts.SoundFile}
+}
+
+// AlarmSettingsOf reads the [alarms] settings. Without a sound_file it
+// rings with the built-in alarm.
+func AlarmSettingsOf(c config.Config) (Settings, error) {
+	s := Settings{Popup: c.Alarms.Popup, Sound: true, SoundFile: c.Alarms.SoundFile, Ring: c.Alarms.RingTime, Urgent: true}
+	if s.SoundFile == "" {
+		f, err := AlarmSoundFile()
+		if err != nil {
+			return s, err
+		}
+		s.SoundFile = f
+	}
+	return s, nil
 }
 
 // Pending returns the alerts that should go off at now: open tasks with an
@@ -92,6 +115,25 @@ func Pending(tasks []*todo.Task, now time.Time, lead time.Duration) []Alert {
 	return out
 }
 
+// Alarms returns the alarms that should ring at now: open tasks whose
+// alarm: time has passed by less than CatchUp.
+func Alarms(tasks []*todo.Task, now time.Time) []Alert {
+	var out []Alert
+	for _, t := range tasks {
+		at, ok := t.Alarm()
+		if t.Done || !ok || now.Before(at) || !now.Before(at.Add(CatchUp)) {
+			continue
+		}
+		text := listview.Body(t)
+		if text == "" {
+			text = t.Text
+		}
+		out = append(out, Alert{Text: text, At: at, FireAt: at, Alarm: true})
+	}
+	sort.SliceStable(out, func(i, j int) bool { return out[i].At.Before(out[j].At) })
+	return out
+}
+
 // MarkerDir is where sent alerts are recorded: the user cache folder plus
 // katTasks/alerted.
 func MarkerDir() string {
@@ -105,7 +147,11 @@ func MarkerDir() string {
 // key names an alert's marker. It uses the at: time, not the lead, so
 // changing alerts.lead doesn't repeat an alert.
 func key(a Alert) string {
-	h := sha1.Sum([]byte(a.At.Format(time.RFC3339) + "\x00" + a.Text))
+	kind := "at"
+	if a.Alarm {
+		kind = "alarm"
+	}
+	h := sha1.Sum([]byte(kind + "\x00" + a.At.Format(time.RFC3339) + "\x00" + a.Text))
 	return hex.EncodeToString(h[:])
 }
 
@@ -224,29 +270,38 @@ func Watch(ctx context.Context, o Options) {
 	}
 }
 
-// Check sends the alerts that are due now; see Watch.
+// Check sends the alerts and rings the alarms that are due now; see Watch.
+// An alarm rings for alarms.ring before Check returns.
 func (o Options) Check() error {
 	o.defaults()
 	cfg, tasks, err := o.Source()
-	if err != nil || !cfg.Alerts.Enabled {
+	if err != nil {
 		return err
-	}
-	s := SettingsOf(cfg)
-	if !s.Popup && !s.Sound {
-		return nil
 	}
 	now := o.Now()
 	prune(o.Dir, now)
 	var errs []error
-	for _, a := range Pending(tasks, now, cfg.Alerts.LeadTime) {
-		first, err := Claim(o.Dir, a)
-		if err != nil {
+	send := func(as []Alert, s Settings) {
+		for _, a := range as {
+			first, err := Claim(o.Dir, a)
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			if first {
+				errs = append(errs, o.Send(a, s))
+			}
+		}
+	}
+	if cfg.Alarms.Enabled {
+		if as := Alarms(tasks, now); len(as) > 0 {
+			s, err := AlarmSettingsOf(cfg)
 			errs = append(errs, err)
-			continue
+			send(as, s)
 		}
-		if first {
-			errs = append(errs, o.Send(a, s))
-		}
+	}
+	if s := SettingsOf(cfg); cfg.Alerts.Enabled && (s.Popup || s.Sound) {
+		send(Pending(tasks, now, cfg.Alerts.LeadTime), s)
 	}
 	return errors.Join(errs...)
 }

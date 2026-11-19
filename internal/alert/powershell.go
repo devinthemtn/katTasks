@@ -3,6 +3,7 @@ package alert
 import (
 	"encoding/base64"
 	"os"
+	"strconv"
 	"unicode/utf16"
 )
 
@@ -26,7 +27,12 @@ if ($env:KATTASKS_POPUP -eq '1') {
   $app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
   [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($app).Show([Windows.UI.Notifications.ToastNotification]::new($x))
 }
-if ($sound -eq 'file') {
+if ($sound -eq 'file' -and $env:KATTASKS_RING) {
+  $p = New-Object System.Media.SoundPlayer $env:KATTASKS_SOUNDFILE
+  $p.PlayLooping()
+  Start-Sleep -Seconds ([int]$env:KATTASKS_RING)
+  $p.Stop()
+} elseif ($sound -eq 'file') {
   (New-Object System.Media.SoundPlayer $env:KATTASKS_SOUNDFILE).PlaySync()
 } elseif ($sound -eq 'default' -and $env:KATTASKS_POPUP -ne '1') {
   [System.Media.SystemSounds]::Asterisk.Play()
@@ -60,12 +66,16 @@ func sendPowerShell(title, body string, s Settings, wsl bool) error {
 	if s.Popup {
 		popup = "1"
 	}
-	env := append(os.Environ(),
+	ringSecs := ""
+	if s.Ring > 0 {
+		ringSecs = strconv.Itoa(max(1, int(s.Ring.Seconds())))
+	}
+	env := append(os.Environ(), "KATTASKS_RING="+ringSecs,
 		"KATTASKS_TITLE="+title, "KATTASKS_BODY="+body, "KATTASKS_POPUP="+popup,
 		"KATTASKS_SOUND="+sound, "KATTASKS_SOUNDFILE="+s.SoundFile)
 	dir := ""
 	if wsl {
-		share := "KATTASKS_TITLE/u:KATTASKS_BODY/u:KATTASKS_POPUP/u:KATTASKS_SOUND/u:KATTASKS_SOUNDFILE/up"
+		share := "KATTASKS_TITLE/u:KATTASKS_BODY/u:KATTASKS_POPUP/u:KATTASKS_SOUND/u:KATTASKS_SOUNDFILE/up:KATTASKS_RING/u"
 		if w := os.Getenv("WSLENV"); w != "" {
 			share = w + ":" + share
 		}

@@ -382,3 +382,40 @@ func WorkLabels(t *todo.Task) (status string, doing bool, progress string) {
 	}
 	return status, doing, progress
 }
+
+// AlarmLabel is the badge for an open task's alarm: tag, e.g. "⏰ 7:30"
+// today, "⏰ tomorrow 7:30", "⏰ Fri 7:30" this week, "⏰ Dec 1 7:30"; past
+// is true once it has rung. Empty without one, or when the task is done.
+func AlarmLabel(t *todo.Task, now time.Time) (label string, past bool) {
+	a, ok := t.Alarm()
+	if !ok || t.Done {
+		return "", false
+	}
+	clock := todo.FormatClock(a.Hour()*60 + a.Minute())
+	today := Today(now)
+	days := int(math.Round(time.Date(a.Year(), a.Month(), a.Day(), 0, 0, 0, 0, time.Local).Sub(today).Hours() / 24))
+	switch {
+	case days == 0:
+		label = clock
+	case days == 1:
+		label = "tomorrow " + clock
+	case days > 1 && days < 7:
+		label = a.Format("Mon ") + clock
+	case a.Year() == now.Year():
+		label = a.Format("Jan 2 ") + clock
+	default:
+		label = a.Format("2006-01-02 ") + clock
+	}
+	return "⏰ " + label, a.Before(now)
+}
+
+// IsAlarmTag reports whether word is an alarm: tag that Alarm reads, so a
+// row can show it as a badge instead.
+func IsAlarmTag(word string) bool {
+	k, v, ok := strings.Cut(word, ":")
+	if !ok || k != "alarm" {
+		return false
+	}
+	_, ok = todo.ParseAlarm(v)
+	return ok
+}

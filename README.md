@@ -144,6 +144,13 @@ popup = true                 # a desktop notification
 sound = true                 # and a sound
 sound_file = ""              # empty = the system's notification sound; .wav works everywhere
 
+[alarms]                     # see Alarms below
+enabled = true               # ring at a task's alarm: date and time
+popup = true                 # with a desktop notification
+ring = "30s"                 # how long it rings, "1s" to "30m"
+sound_file = ""              # empty = katTasks's alarm-clock beeping; .wav works everywhere
+default_time = "7:00"        # where the picker starts for a new alarm
+
 [keys]                       # action = "key" or ["key", "key"]
 # add = ["a", "n"]
 # top = "gg"
@@ -212,7 +219,7 @@ Keys are written like `ctrl+u`, `alt+x`, `shift+tab`, `enter`, `esc`, `space`,
 Adding (`a`) or editing a task opens a small box in the middle of the screen,
 with a reminder of the `(A)`, `+project`, `@context`, `due:` and `rec:` syntax
 underneath. While typing a task, `tab` completes `+project`, `@context`, `due:`, `rec:`
-and `at:` words; `at:` offers the next half hours, and times that fit what
+and `at:` words (`alarm:` opens a [date and time picker](#alarms)); `at:` offers the next half hours, and times that fit what
 you've typed (`at:9` → `at:9:00`, `at:9:15`…; `at:3p` → `at:3pm`). Relative due dates are converted to `YYYY-MM-DD` when you save:
 `due:today`, `due:tomorrow`, `due:fri`, `due:+3d`, `due:+2w`, `due:+1m`. When a
 project or context is selected in the sidebar, `a` fills it in for you.
@@ -324,6 +331,36 @@ uninstaller removes it. Under WSL, `task install` doesn't; run `katTasks.exe
 remind -install` from Windows once if you want it. On macOS the
 notifications come from Script Editor, which macOS may ask you to allow the
 first time.
+
+## Alarms
+
+An `alarm:` tag rings like an alarm clock at a date and time, for when a
+quiet notification isn't enough: `Leave for airport
+alarm:2026-12-01T05:30`. Typing `alarm:` while adding or editing a task
+opens a picker:
+
+| keys | |
+|---|---|
+| `←` `→` `↑` `↓` (or `h` `l` `k` `j`) | day, week |
+| `[` `]` | month |
+| `t` / `T` | today / tomorrow |
+| `tab` | switch between the date and the time |
+| `↑` `↓`, `←` `→` in the time | 15 minutes, an hour |
+| type `6:45`, `645` or `7pm` | set the time |
+| `enter` / `esc` | set it / cancel |
+
+`tab` on an `alarm:` already in the line opens the picker on it again. In
+katTasks-gui you can also click a day (double-click sets it) and the time's
+arrows. A new alarm starts at `alarms.default_time`, today if that's still
+ahead and tomorrow if not. The list shows it as `⏰ tomorrow 5:30`.
+
+It rings with a built-in beep-beep-beep-beep for `alarms.ring` (30 seconds
+by default), or with your own `sound_file`, and with an urgent notification
+if `popup` is on. Alarms are sent like [alerts](#alerts): by katTasks,
+katTasks-gui and `katTasks remind` in the background, once each, and up to
+15 minutes late after sleep. Done tasks don't ring. When a `rec:` task is
+completed, its next copy's alarm moves along with its due date.
+`katTasks remind -test-alarm` rings a sample one now.
 
 ## In progress
 
@@ -452,7 +489,7 @@ the task list to see the numbers. Several numbers can be given as `do 2 5` or
 | `lsa [QUERY…]` (`listall`) | the same, including done.txt (numbered 0) |
 | `lsp [X or A-C]` (`listpri`) | tasks with a priority |
 | `lsprj` (`listproj`), `lsc` (`listcon`) | every project / context |
-| `remind` | run the background reminder; `-test`, `-install`, `-uninstall`, see [Alerts](#alerts) |
+| `remind` | run the background reminder for alerts and alarms; `-test`, `-test-alarm`, `-install`, `-uninstall`, see [Alerts](#alerts) |
 
 ```
 $ katTasks add "Pay rent +Home due:2026-12-01 rec:+1m"

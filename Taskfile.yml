@@ -148,9 +148,32 @@ tasks:
           *":{{.BINDIR}}:"*) ;;
           *) printf '\n  Note: %s is not on your PATH. Add it, e.g. in ~/.bashrc:\n    export PATH="$PATH:%s"\n' "{{.BINDIR}}" "{{.BINDIR}}" ;;
         esac
+      - task: install-launcher
+        if: '! grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null'
+        platforms: [linux]
       - task: install-windows
         if: grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null && command -v cmd.exe >/dev/null
         platforms: [linux]
+
+  # The desktop finds an app's name and icon in its launcher entry, matched
+  # by the window's app id ("katTasks-gui", Wails' ProgramName), so without
+  # this the taskbar shows a plain icon. It uses full paths, since BINDIR may
+  # not be on the desktop session's PATH. install skips it under WSL, where
+  # the Windows Start Menu shortcut is the launcher.
+  install-launcher:
+    desc: Add katTasks-gui to the Linux app launcher, with its icon
+    platforms: [linux]
+    silent: true
+    cmds:
+      - |
+        data=${XDG_DATA_HOME:-$HOME/.local/share}
+        install -Dm644 {{.GUI_DIR}}/build/appicon.png "$data/katTasks/katTasks-gui.png"
+        mkdir -p {{.BIN_DIR}}
+        sed -e "s|^Exec=.*|Exec={{.BINDIR}}/katTasks-gui|" -e "s|^Icon=.*|Icon=$data/katTasks/katTasks-gui.png|" \
+          {{.GUI_DIR}}/build/linux/katTasks-gui.desktop > {{.BIN_DIR}}/katTasks-gui.desktop
+        install -Dm644 {{.BIN_DIR}}/katTasks-gui.desktop "$data/applications/katTasks-gui.desktop"
+        update-desktop-database -q "$data/applications" 2>/dev/null || true
+        printf '  %-17s %s\n' "App launcher" "katTasks, with its icon ($(echo "$data/applications/katTasks-gui.desktop" | sed "s|^$HOME/|~/|"))"
 
   # From WSL: copies katTasks.exe and katTasks-gui.exe to
   # %LOCALAPPDATA%\Programs\katTasks (where the installer puts them), then

@@ -71,8 +71,11 @@ top of the repository:
     task dev-gui               # run the app with live reload while working on it
     task test                  # every Go test, and the window's key-handling tests
 
-`task install` takes `BINDIR=…` to install somewhere else. In WSL it also
-installs the Windows versions (`task install-windows`):
+`task install` takes `BINDIR=…` to install somewhere else. On Linux it also
+adds katTasks to the app launcher with its icon (`task install-launcher`,
+in `~/.local/share`), which is also how the taskbar or dock finds the icon. In
+WSL it skips that and installs the Windows versions instead
+(`task install-windows`):
 
 - `katTasks.exe` and `katTasks-gui.exe` go into
   `%LOCALAPPDATA%\Programs\katTasks`, which is added to your Windows PATH;

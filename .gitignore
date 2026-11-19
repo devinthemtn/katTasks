@@ -1,4 +1,4 @@
 /katTasks
-dist/
-gui-dist/
+/dist/
+/gui-dist/
 bin/

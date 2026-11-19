@@ -29,7 +29,7 @@ jobs:
         include:
           - { os: linux, arch: amd64, runner: ubuntu-24.04, test: true }
           - { os: linux, arch: arm64, runner: ubuntu-24.04-arm }
-          - { os: windows, arch: amd64, runner: ubuntu-24.04 } # no cgo: cross-compiled
+          - { os: windows, arch: amd64, runner: ubuntu-24.04, installer: true } # no cgo: cross-compiled
           - { os: windows, arch: arm64, runner: ubuntu-24.04 }
           - { os: darwin, arch: universal, runner: macos-latest }
     name: gui (${{ matrix.os }} ${{ matrix.arch }})
@@ -98,6 +98,17 @@ jobs:
           mkdir -p ../gui-dist "$d"
           cp bin/katTasks-gui.exe ../README.md "$d"/
           zip -r ../gui-dist/"$d".zip "$d"
+
+      # The setup exe most Windows users want: both katTasks-gui.exe and
+      # katTasks.exe, a Start Menu shortcut, the PATH entry, WebView2 if it's
+      # missing and an uninstaller. Built by the repo-root Taskfile, which
+      # also builds the CLI exe with its icon and version info.
+      - name: Build the Windows installer
+        if: matrix.installer
+        run: |
+          sudo apt-get update && sudo apt-get install -y nsis
+          task -d .. build-win-installer VERSION=${{ steps.version.outputs.version }}
+          cp ../bin/katTasks-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}-setup.exe ../gui-dist/
 
       - name: Build (macOS)
         if: matrix.os == 'darwin'

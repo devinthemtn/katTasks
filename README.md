@@ -28,7 +28,9 @@ This puts `katTasks` in `$(go env GOPATH)/bin` (usually `~/go/bin`); make sure
 that's on your `PATH`. Or build from a checkout with `go build -o katTasks .`.
 
 Prebuilt binaries for Linux, macOS and Windows (x86-64 and ARM64) are on the
-[releases page](https://github.com/devinthemtn/katTasks/releases).
+[releases page](https://github.com/devinthemtn/katTasks/releases). On
+Windows, `katTasks-<version>-windows-amd64-setup.exe` there installs both
+the terminal app and the desktop app.
 
 ## Desktop app (katTasks-gui)
 

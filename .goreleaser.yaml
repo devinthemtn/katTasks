@@ -60,6 +60,9 @@ release:
     The macOS builds aren't signed: if macOS blocks one, allow it in System Settings → Privacy & Security,
     or run `xattr -d com.apple.quarantine katTasks`.
 
+    On Windows, `katTasks-{{ .Version }}-windows-amd64-setup.exe` installs both the desktop app and the
+    terminal app per user (no admin), with a Start Menu shortcut, a PATH entry and an uninstaller.
+
     The `katTasks-gui_…` archives are the desktop app. On Linux it needs GTK 3 and WebKitGTK 4.1
     (`libgtk-3-0 libwebkit2gtk-4.1-0` on Debian and Ubuntu); the macOS one is a universal `.app`.
 

@@ -146,3 +146,13 @@ func TestCSSColorsBackground(t *testing.T) {
 		t.Errorf("default: bg %q / %q", c.Light["bg"], c.Dark["bg"])
 	}
 }
+
+func TestCSSFontFamily(t *testing.T) {
+	if got := cssFontFamily(""); !strings.HasPrefix(got, `"JetBrains Mono", `) || !strings.HasSuffix(got, ", monospace") {
+		t.Errorf("default: %s", got)
+	}
+	got := cssFontFamily(` Fira Code , 'Iosevka Term', Monospace, menlo`)
+	if !strings.HasPrefix(got, `"Fira Code", "Iosevka Term", monospace, "menlo", "JetBrains Mono"`) || strings.Count(got, "monospace") != 1 || strings.Contains(got, `"Menlo"`) {
+		t.Errorf("custom: %s", got)
+	}
+}

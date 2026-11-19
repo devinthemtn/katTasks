@@ -40,6 +40,18 @@ hide_keys = []
 # terminal's OSC 52 escape too; empty uses only that.
 command = ""
 
+[gui]
+# katTasks-gui only; the terminal app uses your terminal's font.
+# Font family for the window: one or more font names separated by commas,
+# e.g. "Fira Code" or "Iosevka, Menlo"; the first one installed is used. A
+# monospace font keeps the columns lined up. Empty uses the first installed
+# of JetBrains Mono, Cascadia Mono, Consolas, DejaVu Sans Mono and Menlo,
+# which also back up the family set here.
+font_family = ""
+# Text size in pixels, 8 to 48. ctrl+= and ctrl+- zoom for the session;
+# ctrl+0 returns to this size.
+font_size = 14
+
 [keys]
 # Rebind any action: name = "key" or ["key", "other key"]. Keys use names
 # like "ctrl+u", "enter", "space", "tab"; two plain characters such as "gg"

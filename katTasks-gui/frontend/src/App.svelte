@@ -15,7 +15,13 @@
   let s = $state<Snapshot | null>(null);
   let startupError = $state('');
   let dark = $state(matchMedia('(prefers-color-scheme: dark)').matches);
-  let fontSize = $state(loadFontSize());
+  // gui.font_size and gui.font_family from the settings; ctrl+= / ctrl+- zoom
+  // from that size for this session, ctrl+0 goes back to it.
+  let zoomBy = $state(0);
+  const MIN_SIZE = 8, MAX_SIZE = 48;
+  const baseSize = $derived(s?.fontSize || 14);
+  const fontSize = $derived(Math.min(MAX_SIZE, Math.max(MIN_SIZE, baseSize + zoomBy)));
+  const font = $derived(s?.font ?? '');
 
   let measure: HTMLSpanElement;
   let listEl = $state<HTMLDivElement>();
@@ -54,20 +60,15 @@
     send(() => api.Resize(cols, rows));
   }
 
-  function loadFontSize(): number {
-    try {
-      const n = Number(localStorage.getItem('kattasks.fontSize'));
-      if (n >= 9 && n <= 32) return n;
-    } catch {}
-    return 14;
+  function zoom(step: number) {
+    zoomBy = step === 0 ? 0 : Math.min(MAX_SIZE, Math.max(MIN_SIZE, fontSize + step)) - baseSize;
   }
 
-  async function zoom(step: number) {
-    fontSize = step === 0 ? 14 : Math.min(32, Math.max(9, fontSize + step));
-    try { localStorage.setItem('kattasks.fontSize', String(fontSize)); } catch {}
-    await tick();
-    remeasure();
-  }
+  // A new font or size changes how many characters and rows fit.
+  $effect(() => {
+    void fontSize; void font;
+    tick().then(remeasure);
+  });
 
   // ---- keys and mouse ------------------------------------------------------
 
@@ -134,7 +135,7 @@
   const cssVars = $derived(
     Object.entries({ ...Object.fromEntries(Object.keys(fallback).map((k) => [k, ''])), ...colors })
       .map(([k, v]) => `--${k.replace('_', '-')}: ${v || (fallback[k] ? fallback[k][dark ? 1 : 0] : 'inherit')}`)
-      .join('; ') + `; font-size: ${fontSize}px`,
+      .join('; ') + `; font-size: ${fontSize}px` + (font ? `; font-family: ${font}` : ''),
   );
 
   const cols = $derived(Math.floor(window.innerWidth / cw));

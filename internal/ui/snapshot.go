@@ -50,6 +50,9 @@ type Snapshot struct {
 	PickIdx int        `json:"pickIdx"`
 	Theme   string     `json:"theme"`
 	Colors  Colors     `json:"colors"`
+
+	Font     string `json:"font"`     // CSS font-family, from gui.font_family
+	FontSize int    `json:"fontSize"` // pixels, from gui.font_size
 }
 
 // Seg is a piece of styled text. Style is a theme color key, or one of
@@ -199,6 +202,7 @@ func (m Model) Snapshot() Snapshot {
 		s.Agenda = m.agendaSnapshot()
 	}
 	s.Footer = m.footerSegs()
+	s.Font, s.FontSize = cssFontFamily(m.cfg.GUI.FontFamily), m.cfg.GUI.FontSize
 	if t, ok := theme.Find(m.themes, m.theme); ok {
 		s.Colors = cssColors(t)
 	}
@@ -444,6 +448,31 @@ func cssColors(t theme.Theme) Colors {
 
 // builtinBg are the backgrounds the built-in dark themes were designed on.
 var builtinBg = map[string]string{"nord": "#2E3440", "gruvbox": "#282828", "dracula": "#282A36"}
+
+// monoFonts back up gui.font_family, and are the family when it is empty.
+var monoFonts = []string{"JetBrains Mono", "Cascadia Mono", "Cascadia Code", "Consolas", "DejaVu Sans Mono", "Liberation Mono", "Menlo", "monospace"}
+
+var genericFonts = map[string]bool{"monospace": true, "ui-monospace": true, "sans-serif": true, "serif": true, "system-ui": true, "ui-sans-serif": true}
+
+// cssFontFamily turns gui.font_family ("Fira Code, Menlo") into a CSS font-family
+// list: each name quoted, followed by the monospace fonts.
+func cssFontFamily(font string) string {
+	var out []string
+	seen := map[string]bool{}
+	for _, n := range append(strings.Split(font, ","), monoFonts...) {
+		n = strings.Trim(strings.TrimSpace(n), `"'`)
+		if n == "" || seen[strings.ToLower(n)] {
+			continue
+		}
+		seen[strings.ToLower(n)] = true
+		if genericFonts[strings.ToLower(n)] {
+			out = append(out, strings.ToLower(n))
+		} else {
+			out = append(out, `"`+strings.ReplaceAll(n, `"`, "")+`"`)
+		}
+	}
+	return strings.Join(out, ", ")
+}
 
 // ansi16 are xterm's first sixteen colors.
 var ansi16 = [16]string{

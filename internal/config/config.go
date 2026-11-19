@@ -20,6 +20,13 @@ import (
 // AppName is the config folder name.
 const AppName = "katTasks"
 
+// The text size katTasks-gui allows, in pixels.
+const (
+	MinFontSize     = 8
+	MaxFontSize     = 48
+	DefaultFontSize = 14
+)
+
 // SettingsFile is the settings file name inside Dir().
 const SettingsFile = "config.toml"
 
@@ -48,6 +55,10 @@ type Config struct {
 	Clipboard struct {
 		Command string `toml:"command"`
 	} `toml:"clipboard"`
+	GUI struct {
+		FontFamily string `toml:"font_family"`
+		FontSize   int    `toml:"font_size"`
+	} `toml:"gui"`
 	RawKeys map[string]any    `toml:"keys"`
 	Filters map[string]string `toml:"filters"`
 
@@ -183,6 +194,15 @@ func (c *Config) normalize() []error {
 	if !valid {
 		bad("view.sort", fmt.Sprintf("%q", c.View.Sort), `want "priority", "due", "created" or "file"`)
 		c.View.Sort = "priority"
+	}
+	c.GUI.FontFamily = strings.TrimSpace(c.GUI.FontFamily)
+	if strings.ContainsAny(c.GUI.FontFamily, ";{}<>\\") {
+		bad("gui.font_family", fmt.Sprintf("%q", c.GUI.FontFamily), "want font names separated by commas")
+		c.GUI.FontFamily = ""
+	}
+	if c.GUI.FontSize < MinFontSize || c.GUI.FontSize > MaxFontSize {
+		bad("gui.font_size", c.GUI.FontSize, fmt.Sprintf("want %d to %d", MinFontSize, MaxFontSize))
+		c.GUI.FontSize = DefaultFontSize
 	}
 	for i, k := range c.View.HideKeys {
 		c.View.HideKeys[i] = strings.ToLower(strings.TrimSpace(k))

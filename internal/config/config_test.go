@@ -150,3 +150,17 @@ func TestDefaultHidesCompleted(t *testing.T) {
 		t.Errorf("a config without hide_completed should hide them: %v", errs)
 	}
 }
+
+func TestParseGUI(t *testing.T) {
+	if d := Defaults(); d.GUI.FontFamily != "" || d.GUI.FontSize != DefaultFontSize {
+		t.Errorf("defaults: %+v", d.GUI)
+	}
+	c, errs := Parse("[gui]\nfont_family = \"  Fira Code, monospace \"\nfont_size = 18\n")
+	if len(errs) > 0 || c.GUI.FontFamily != "Fira Code, monospace" || c.GUI.FontSize != 18 {
+		t.Errorf("valid: %+v %v", c.GUI, errs)
+	}
+	c, errs = Parse("[gui]\nfont_family = \"x; color: red\"\nfont_size = 2\n")
+	if len(errs) != 2 || c.GUI.FontFamily != "" || c.GUI.FontSize != DefaultFontSize {
+		t.Errorf("invalid: %+v %v", c.GUI, errs)
+	}
+}

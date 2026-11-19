@@ -44,7 +44,10 @@ and it reads the same settings file and todo.txt. It also adds:
 - **Calendar:** each day lists its tasks. Click a day to choose it,
   double-click to list its tasks; click a task to go to it, double-click to
   edit it; `‹` `›` change the month.
-- **Zoom:** `ctrl+=` and `ctrl+-` change the text size, `ctrl+0` resets it.
+- **Font:** `font_family` and `font_size` under `[gui]` in the settings set
+  the window's font (see [Settings](#settings)); `ctrl+r` applies edits.
+  `ctrl+=` and `ctrl+-` zoom for the session, and `ctrl+0` returns to
+  `font_size`.
 - **Paste:** `ctrl+v` pastes into the task being typed.
 - **Clipboard:** `yy` and `yb` use the system clipboard, so `clipboard.command`
   isn't needed.
@@ -109,6 +112,10 @@ hide_keys = []               # key:value tags to hide from rows, e.g. ["uid"]
 
 [clipboard]
 command = ""                 # also pipe copies to this, e.g. "wl-copy" or "clip.exe"
+
+[gui]                        # katTasks-gui only
+font_family = ""             # e.g. "Fira Code" or "Iosevka, Menlo"; empty = a built-in monospace list
+font_size = 14               # pixels, 8–48; ctrl+= / ctrl+- zoom, ctrl+0 returns to this
 
 [keys]                       # action = "key" or ["key", "key"]
 # add = ["a", "n"]

@@ -124,6 +124,8 @@ func defineActions() []*action {
 			}
 			return nil
 		}},
+		{name: "calendar", desc: "calendar of due dates", group: groupView, defaults: []string{"c"}, run: func(m *Model) tea.Cmd { m.toggleCalendar(); return nil }},
+		{name: "agenda", desc: "week agenda, by day and time", group: groupView, defaults: []string{"w"}, run: func(m *Model) tea.Cmd { m.toggleAgenda(); return nil }},
 		{name: "toggle_line_numbers", desc: "line numbers", group: groupView, defaults: []string{"L"}, run: func(m *Model) tea.Cmd { m.lineNums = !m.lineNums; return nil }},
 		{name: "theme_picker", desc: "pick theme", group: groupView, defaults: []string{"T"}, run: func(m *Model) tea.Cmd { m.openThemePicker(); return nil }},
 		{name: "cycle_theme", desc: "next theme", group: groupView, run: func(m *Model) tea.Cmd { m.cycleTheme(); return nil }},

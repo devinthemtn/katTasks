@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"strings"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 
+	"github.com/devinthemtn/katTasks/internal/listview"
 	"github.com/devinthemtn/katTasks/internal/todo"
 )
 
@@ -96,6 +96,10 @@ func (m Model) viewBody() string {
 		main = lipgloss.NewStyle().Padding(0, 1).Render(
 			m.st.header.Render("KEYS") + m.st.faint.Render("   katTasks "+m.opts.Version) + "\n\n" + m.fullHelp(lw-4) + "\n\n" + m.inputHelp() +
 				"\n\n" + m.st.faint.Render("press any key to close"))
+	} else if m.agenda {
+		main = lipgloss.NewStyle().Padding(0, 1).Render(m.viewAgenda(lw-4, inner))
+	} else if m.calendar {
+		main = lipgloss.NewStyle().Padding(0, 1).Render(m.viewCalendar(lw-4, inner))
 	} else {
 		main = m.viewList(lw-2, inner)
 	}
@@ -119,16 +123,16 @@ func (m Model) viewSidebar(w, h int) string {
 	end := min(len(m.side), m.sideOffset+h)
 	for i := m.sideOffset; i < end; i++ {
 		e := m.side[i]
-		if e.kind == entryHeader {
-			lines = append(lines, m.st.header.Render(" "+e.value))
+		if e.Kind == entryHeader {
+			lines = append(lines, m.st.header.Render(" "+e.Value))
 			continue
 		}
-		label := e.label()
-		count := fmt.Sprint(e.count)
+		label := e.Label()
+		count := fmt.Sprint(e.Count)
 		labelW := w - len(count) - 3
 		label = truncate(label, max(labelW, 1))
 		var ls lipgloss.Style
-		switch e.kind {
+		switch e.Kind {
 		case entryProject:
 			ls = m.st.project
 		case entryContext:
@@ -283,29 +287,13 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 	return prefix + text + on(m.st.text).Render(strings.Repeat(" ", max(pad, 0))) + badge
 }
 
-func isTag(w string) bool {
-	k, v, ok := strings.Cut(w, ":")
-	return ok && k != "" && v != "" && !strings.HasPrefix(v, "//")
-}
+func isTag(w string) bool { return listview.IsTag(w) }
 
 func (st styles) dueLabel(d, now time.Time) (string, lipgloss.Style) {
-	y, mo, dd := now.Date()
-	today := time.Date(y, mo, dd, 0, 0, 0, 0, time.Local)
-	days := int(math.Round(d.Sub(today).Hours() / 24))
-	switch {
-	case days < 0:
-		return fmt.Sprintf("overdue %dd", -days), st.overdue
-	case days == 0:
-		return "today", st.today
-	case days == 1:
-		return "tomorrow", st.due
-	case days < 7:
-		return d.Format("Mon"), st.due
-	case d.Year() == today.Year():
-		return d.Format("Jan 2"), st.faint
-	default:
-		return d.Format("2006-01-02"), st.faint
-	}
+	label, kind := listview.DueLabel(d, now)
+	return label, map[listview.DueKind]lipgloss.Style{
+		listview.DueOverdue: st.overdue, listview.DueToday: st.today, listview.DueSoon: st.due, listview.DueLater: st.faint,
+	}[kind]
 }
 
 func (m Model) viewFooter() string {
@@ -353,6 +341,12 @@ func (m Model) viewFooter() string {
 			l1 = " " + m.st.err.Render("⚠ "+m.configWarn) + m.st.faint.Render("  (fix, then ctrl+r)")
 		}
 		l2 = " " + m.shortHelp()
+		if m.calendar {
+			l2 = " " + m.st.faint.Render(calendarHelp)
+		}
+		if m.agenda {
+			l2 = " " + m.st.faint.Render(agendaHelp)
+		}
 		if m.visual {
 			l2 = m.st.suggestOn.Render(fmt.Sprintf("VISUAL %d", len(m.sel))) + " " +
 				m.st.faint.Render("space mark · x done · d delete · p priority · yy copy · esc leave")

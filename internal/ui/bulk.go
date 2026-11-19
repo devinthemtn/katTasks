@@ -2,12 +2,12 @@ package ui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/devinthemtn/katTasks/internal/listview"
 	"github.com/devinthemtn/katTasks/internal/todo"
 )
 
@@ -262,91 +262,6 @@ func (m *Model) updatePriority(msg tea.KeyMsg) {
 
 // ---- reordering ----------------------------------------------------------------
 
-// compareTasks orders two tasks under a sort mode, ignoring file order; 0
-// means they tie and file order decides.
-func compareTasks(mode string, a, b *todo.Task) int {
-	if mode == "file" {
-		return 0
-	}
-	if a.Done != b.Done {
-		if !a.Done {
-			return -1
-		}
-		return 1
-	}
-	pri := func(t *todo.Task) int {
-		if t.Priority == 0 {
-			return 27
-		}
-		return int(t.Priority - 'A')
-	}
-	cmpInt := func(x, y int) int {
-		switch {
-		case x < y:
-			return -1
-		case x > y:
-			return 1
-		}
-		return 0
-	}
-	cmpDue := func() int {
-		da, oka := a.Due()
-		db, okb := b.Due()
-		switch {
-		case oka != okb:
-			if oka {
-				return -1
-			}
-			return 1
-		case oka && da.Before(db):
-			return -1
-		case oka && db.Before(da):
-			return 1
-		}
-		return 0
-	}
-	switch mode {
-	case "priority":
-		if c := cmpInt(pri(a), pri(b)); c != 0 {
-			return c
-		}
-		return cmpDue()
-	case "due":
-		if c := cmpDue(); c != 0 {
-			return c
-		}
-		return cmpInt(pri(a), pri(b))
-	case "created":
-		switch {
-		case a.Created.Equal(b.Created):
-			return 0
-		case a.Created.IsZero():
-			return 1
-		case b.Created.IsZero():
-			return -1
-		case a.Created.After(b.Created):
-			return -1
-		}
-		return 1
-	}
-	return 0
-}
-
-func (m *Model) sortVisible() {
-	order := make(map[*todo.Task]int, len(m.tasks))
-	for i, t := range m.tasks {
-		order[t] = i
-	}
-	mode := sortModes[m.sortIdx]
-	sort.SliceStable(m.visible, func(i, j int) bool {
-		a, b := m.visible[i], m.visible[j]
-		if c := compareTasks(mode, a, b); c != 0 {
-			return c < 0
-		}
-		return order[a] < order[b]
-	})
-}
-
 // moveTask swaps the task under the cursor with its neighbor in the file,
 // which moves it within the list. In any sort but "file" only tasks that
 // tie under the sort can swap, or the list order would not change.
@@ -358,10 +273,8 @@ func (m *Model) moveTask(dir int) {
 	}
 	n := m.visible[j]
 	mode := sortModes[m.sortIdx]
-	if compareTasks(mode, t, n) != 0 {
-		m.setError("can only move within the same %s here — press s for file order", map[string]string{
-			"priority": "priority and due date", "due": "due date and priority", "created": "creation date",
-		}[mode])
+	if listview.Compare(mode, t, n, time.Now()) != 0 {
+		m.setError("can only move within the same %s here — press s for file order", listview.MoveScope(mode))
 		return
 	}
 	ti, ni := -1, -1

@@ -6,22 +6,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/devinthemtn/katTasks/internal/config"
+	"github.com/devinthemtn/katTasks/internal/listview"
 )
 
 // currentQuery is what "save search" saves: the / filter, or the sidebar's
 // project or context if there is no filter.
 func (m *Model) currentQuery() string {
-	q := strings.TrimSpace(m.filter)
-	e := m.currentEntry()
-	switch e.kind {
-	case entryProject, entryContext:
-		q = strings.TrimSpace(e.value + " " + q)
-	case entryDue:
-		q = strings.TrimSpace("-due:none " + q)
-	case entrySaved:
-		q = strings.TrimSpace(m.cfg.Filters[e.value] + " " + q)
-	}
-	return q
+	return listview.CurrentQuery(m.currentEntry(), m.filter, m.cfg.Filters)
 }
 
 // startSaveFilter asks for a name for the current search.
@@ -58,7 +49,7 @@ func (m *Model) saveFilter(name string) {
 // selectSaved shows the named saved search, or the first one if name is "".
 func (m *Model) selectSaved(name string) bool {
 	for i, e := range m.side {
-		if e.kind == entrySaved && (name == "" || e.value == name) {
+		if e.Kind == entrySaved && (name == "" || e.Value == name) {
 			m.sideCursor = i
 			m.cursor, m.offset = 0, 0
 			m.refresh(nil)

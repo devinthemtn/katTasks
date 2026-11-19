@@ -31,6 +31,8 @@ archives:
 
 checksum:
   name_template: checksums.txt
+  extra_files:
+    - glob: ./gui-dist/* # the desktop app, built by the workflow's gui job
 
 changelog:
   sort: asc
@@ -50,10 +52,15 @@ changelog:
 
 release:
   name_template: "katTasks {{ .Version }}"
+  extra_files:
+    - glob: ./gui-dist/*
   header: |
     See the [README](https://github.com/devinthemtn/katTasks#install) for install instructions.
     Prebuilt binaries are below; `checksums.txt` has their SHA-256 sums.
     The macOS builds aren't signed: if macOS blocks one, allow it in System Settings → Privacy & Security,
     or run `xattr -d com.apple.quarantine katTasks`.
+
+    The `katTasks-gui_…` archives are the desktop app. On Linux it needs GTK 3 and WebKitGTK 4.1
+    (`libgtk-3-0 libwebkit2gtk-4.1-0` on Debian and Ubuntu); the macOS one is a universal `.app`.
 
     Or install with Go 1.24+: `go install github.com/devinthemtn/katTasks@{{ .Tag }}`

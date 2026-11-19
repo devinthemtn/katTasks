@@ -30,6 +30,45 @@ that's on your `PATH`. Or build from a checkout with `go build -o katTasks .`.
 Prebuilt binaries for Linux, macOS and Windows (x86-64 and ARM64) are on the
 [releases page](https://github.com/devinthemtn/katTasks/releases).
 
+## Desktop app (katTasks-gui)
+
+`katTasks-gui` is the same task list in a window, for Linux, macOS and
+Windows. It runs the terminal app's own list: the keys, chords, `[keys]`
+overrides, themes, saved searches, Lua scripts and messages are all the same,
+and it reads the same settings file and todo.txt. It also adds:
+
+- **Mouse:** click a task to select it, double-click to edit it, click its
+  `[ ]` to mark it done; click a sidebar entry to show it; scroll with the
+  wheel; click a command, theme or completion to choose it; click a key in the
+  footer or on the help screen to run it.
+- **Calendar:** each day lists its tasks. Click a day to choose it,
+  double-click to list its tasks; click a task to go to it, double-click to
+  edit it; `‹` `›` change the month.
+- **Zoom:** `ctrl+=` and `ctrl+-` change the text size, `ctrl+0` resets it.
+- **Paste:** `ctrl+v` pastes into the task being typed.
+- **Clipboard:** `yy` and `yb` use the system clipboard, so `clipboard.command`
+  isn't needed.
+
+`ctrl+c` doesn't quit, as it would in a terminal; use `q` or close the window.
+It takes `-file`, `-config` and `-version` like `katTasks`.
+
+The app is built with [Wails 3](https://v3.wails.io) and lives in
+`katTasks-gui/`, as its own Go module, because Wails needs a newer Go (1.26)
+than katTasks itself. To build it you need Go 1.26, Node.js and npm, `task`
+and `wails3` (`go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`); on
+Linux also the GTK 3 and WebKitGTK 4.1 development packages
+(`libgtk-3-dev libwebkit2gtk-4.1-dev` on Debian and Ubuntu). Then, in
+`katTasks-gui/`:
+
+    task build                 # bin/katTasks-gui for this computer
+    task windows:build         # bin/katTasks-gui.exe, from any OS
+    task windows:package       # a Windows installer (needs makensis)
+    task package               # a package for this OS: AppImage/deb/rpm, .app
+    task dev                   # run with live reload while working on it
+
+`npm test` and `npm run check` in `katTasks-gui/frontend` test the key
+handling and type-check the window code.
+
 ## Flags
 
 | flag | |
@@ -110,6 +149,8 @@ keys one after the other, within 600 ms.
 | `clear_filter` | `esc` | leave visual mode, then clear the search, then the sidebar filter |
 | `cycle_sort` | `s` | priority → due → created → file order |
 | `toggle_show_done` | `H` | hide / show completed tasks |
+| `calendar` | `c` | a month of due dates, in place of the list (see below) |
+| `agenda` | `w` | the list as one week, by day and time (see below) |
 | `toggle_line_numbers` | `L` | show task numbers |
 | `theme_picker` | `T` | pick a theme, previewing as you move |
 | `cycle_theme` | (none) | switch to the next theme |
@@ -138,6 +179,53 @@ underneath. While typing a task, `tab` completes `+project`, `@context`, `due:` 
 words. Relative due dates are converted to `YYYY-MM-DD` when you save:
 `due:today`, `due:tomorrow`, `due:fri`, `due:+3d`, `due:+2w`, `due:+1m`. When a
 project or context is selected in the sidebar, `a` fills it in for you.
+
+## Calendar
+
+`c` shows a month calendar in place of the task list. Each day shows a dot
+and the number of open tasks due that day, in the overdue color for past
+days, and a `✓` when everything due that day is done. The chosen day's tasks
+are listed under the month. The calendar shows the tasks of the sidebar entry
+and search, so with `+work` selected you see only work.
+
+| keys | |
+|---|---|
+| `h` `l`, arrows | previous / next day |
+| `j` `k`, arrows | next / previous week |
+| `[` `]`, `pgup` `pgdown` | previous / next month |
+| `t`, `g` | today |
+| `enter` | list the day's tasks (a `due:` search), where `x`, `e`, `d`… work on them; `esc` clears it |
+| `a` | add a task due that day |
+| `esc`, `c` | close the calendar |
+
+The keys follow your `[keys]` settings: whatever you bound to `down` moves a
+week, to `focus_sidebar` a day back, and so on. `tab` still goes to the
+sidebar, and `/`, `s`, `H`, `:` and `?` work as in the list. Weeks start on
+Sunday.
+
+## Agenda
+
+`w` shows one week of the list (Sunday to Saturday), grouped by due day.
+Under each day come its tasks without a time, then its timed tasks in time
+order with the time in the margin. It's still the task list: `j` `k` move
+over the week's tasks and `x`, `e`, `d`, `p`, `yy` and visual mode work on
+them. It follows the sidebar entry and search, like the list.
+
+| keys | |
+|---|---|
+| `h` `l`, arrows, `[` `]` | previous / next week |
+| `t` | this week |
+| `a` | add a task due on the day under the cursor |
+| `c` | the calendar, on the same day (`w` there comes back) |
+| `esc`, `w` | close the agenda |
+
+A task's time is an `at:` tag (`at:14:30`, `at:9`, `at:3pm`, `at:9:15am`) or
+a time in its text, such as `Standup 9:30` or `Call mom 3pm`. In text a time
+needs minutes or am/pm, so a plain number like `4` isn't taken for one.
+`due:` stays a plain date, so other todo.txt tools still read the file.
+
+In katTasks-gui the agenda is seven columns: each day's untimed tasks at the
+top, then its timed tasks placed down the day by time.
 
 ## Search
 
@@ -288,7 +376,9 @@ Changes print `{action, tasks, added, message}`.
 Releases are built by [GoReleaser](https://goreleaser.com) in GitHub Actions
 (`.github/workflows/release.yml`, configured by `.goreleaser.yaml`). Pushing a
 tag runs the tests, builds every platform, and publishes the release with
-archives, checksums and a changelog from the commits:
+archives, checksums and a changelog from the commits. The desktop app is built
+first, on Linux (x86-64 and ARM64), Windows (x86-64 and ARM64) and macOS (one
+universal `.app`), and its `katTasks-gui_…` archives go in the same release:
 
     git tag -a v0.3.0 -m "katTasks 0.3.0"
     git push origin v0.3.0

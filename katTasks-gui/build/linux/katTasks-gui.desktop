@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=katTasks
+GenericName=Task list
+Comment=Keyboard-driven todo.txt task manager
+Exec=katTasks-gui
+Icon=katTasks-gui
+Categories=Office;Utility;
+Keywords=todo;todo.txt;tasks;gtd;
+Terminal=false
+StartupNotify=false
+StartupWMClass=katTasks-gui

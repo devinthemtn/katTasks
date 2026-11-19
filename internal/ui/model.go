@@ -3,7 +3,6 @@ package ui
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/devinthemtn/katTasks/internal/config"
+	"github.com/devinthemtn/katTasks/internal/listview"
 	"github.com/devinthemtn/katTasks/internal/query"
 	"github.com/devinthemtn/katTasks/internal/script"
 	"github.com/devinthemtn/katTasks/internal/theme"
@@ -40,47 +40,17 @@ const (
 
 var sortModes = config.SortModes
 
-type entryKind int
+// sideEntry is one sidebar row; see listview.
+type sideEntry = listview.Entry
 
 const (
-	entryAll entryKind = iota
-	entryDue
-	entryHeader
-	entryProject
-	entryContext
-	entrySaved
+	entryAll     = listview.All
+	entryDue     = listview.Due
+	entryHeader  = listview.Header
+	entryProject = listview.Project
+	entryContext = listview.Context
+	entrySaved   = listview.Saved
 )
-
-type sideEntry struct {
-	kind  entryKind
-	value string      // project, context, or saved search name
-	q     query.Query // entrySaved
-	count int
-}
-
-func (e sideEntry) label() string {
-	switch e.kind {
-	case entryAll:
-		return "All tasks"
-	case entryDue:
-		return "Has due date"
-	default:
-		return e.value
-	}
-}
-
-func (e sideEntry) match(t *todo.Task) bool {
-	switch e.kind {
-	case entryDue:
-		_, ok := t.Due()
-		return ok
-	case entryProject, entryContext:
-		return t.Has(e.value)
-	case entrySaved:
-		return e.q.Match(t, time.Now())
-	}
-	return true
-}
 
 const maxUndo = 50
 
@@ -135,8 +105,13 @@ type Model struct {
 	pending  string // first key of a chord, waiting for the second
 	chordSeq int
 	showHelp bool
+	calendar bool      // the calendar is shown instead of the task list
+	agenda   bool      // the list shows one week, by day (see agenda.go)
+	calDay   time.Time // the day chosen in the calendar
 
 	width, height int
+
+	copyFn func(string) error // the desktop app's clipboard; nil in a terminal
 }
 
 // Options configure New.
@@ -271,7 +246,7 @@ func (m *Model) currentEntry() sideEntry {
 	if m.sideCursor >= 0 && m.sideCursor < len(m.side) {
 		return m.side[m.sideCursor]
 	}
-	return sideEntry{kind: entryAll}
+	return sideEntry{Kind: entryAll}
 }
 
 // refresh rebuilds the sidebar and visible list. If keep is non-nil the
@@ -282,23 +257,11 @@ func (m *Model) refresh(keep *todo.Task) {
 	}
 	m.buildSidebar()
 
-	entry := m.currentEntry()
 	m.q = query.Parse(m.filter)
-	now := time.Now()
-	m.visible = m.visible[:0]
-	for _, t := range m.tasks {
-		if m.hideDone && t.Done {
-			continue
-		}
-		if !entry.match(t) {
-			continue
-		}
-		if !m.q.Match(t, now) {
-			continue
-		}
-		m.visible = append(m.visible, t)
+	m.visible = listview.Visible(m.tasks, m.currentEntry(), m.q, m.hideDone, sortModes[m.sortIdx], time.Now())
+	if m.agenda {
+		m.agendaFilter()
 	}
-	m.sortVisible()
 
 	if keep != nil {
 		for i, t := range m.visible {
@@ -313,88 +276,9 @@ func (m *Model) refresh(keep *todo.Task) {
 
 func (m *Model) buildSidebar() {
 	prev := m.currentEntry()
-	projects, contexts := map[string]int{}, map[string]int{}
-	used := map[string]int{}
-	due := 0
-	pending := 0
-	for _, t := range m.tasks {
-		for _, p := range t.Projects() {
-			used[p]++
-			if _, ok := projects[p]; !ok {
-				projects[p] = 0
-			}
-			if !t.Done {
-				projects[p]++
-			}
-		}
-		for _, c := range t.Contexts() {
-			used[c]++
-			if _, ok := contexts[c]; !ok {
-				contexts[c] = 0
-			}
-			if !t.Done {
-				contexts[c]++
-			}
-		}
-		if t.Done {
-			continue
-		}
-		pending++
-		if _, ok := t.Due(); ok {
-			due++
-		}
-	}
-
-	m.side = []sideEntry{{kind: entryAll, count: pending}, {kind: entryDue, count: due}}
-	if names := m.cfg.FilterNames(); len(names) > 0 {
-		m.side = append(m.side, sideEntry{kind: entryHeader, value: "SAVED"})
-		now := time.Now()
-		for _, n := range names {
-			e := sideEntry{kind: entrySaved, value: n, q: query.Parse(m.cfg.Filters[n])}
-			for _, t := range m.tasks {
-				if !t.Done && e.q.Match(t, now) {
-					e.count++
-				}
-			}
-			m.side = append(m.side, e)
-		}
-	}
-	add := func(title string, kind entryKind, set map[string]int) {
-		if len(set) == 0 {
-			return
-		}
-		names := make([]string, 0, len(set))
-		for n := range set {
-			names = append(names, n)
-		}
-		sort.Slice(names, func(i, j int) bool { return strings.ToLower(names[i]) < strings.ToLower(names[j]) })
-		m.side = append(m.side, sideEntry{kind: entryHeader, value: title})
-		for _, n := range names {
-			m.side = append(m.side, sideEntry{kind: kind, value: n, count: set[n]})
-		}
-	}
-	add("PROJECTS", entryProject, projects)
-	add("CONTEXTS", entryContext, contexts)
-
-	m.known = m.known[:0]
-	for w := range used {
-		m.known = append(m.known, w)
-	}
-	sort.Slice(m.known, func(i, j int) bool {
-		if used[m.known[i]] != used[m.known[j]] {
-			return used[m.known[i]] > used[m.known[j]]
-		}
-		return m.known[i] < m.known[j]
-	})
-
+	m.side, m.known = listview.Sidebar(m.tasks, m.cfg.Filters, time.Now())
 	// Keep the same sidebar selection if it still exists.
-	m.sideCursor = 0
-	for i, e := range m.side {
-		if e.kind == prev.kind && e.value == prev.value {
-			m.sideCursor = i
-			break
-		}
-	}
+	m.sideCursor = listview.Find(m.side, prev.Kind, prev.Value)
 }
 
 func (m *Model) listRows() int {
@@ -596,6 +480,12 @@ func (m Model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// Not a chord: handle the key on its own.
 	}
+	if m.calendar && m.focus == focusList && m.calendarKey(k) {
+		return m, nil
+	}
+	if m.agenda && m.focus == focusList && m.agendaKey(k) {
+		return m, nil
+	}
 	if m.visual && k == " " {
 		m.toggleSelected()
 		return m, nil
@@ -657,7 +547,7 @@ func (m *Model) move(how moveKind) {
 			c += half
 		}
 		c = clamp(c, 0, len(m.side)-1)
-		for c >= 0 && c < len(m.side) && m.side[c].kind == entryHeader {
+		for c >= 0 && c < len(m.side) && m.side[c].Kind == entryHeader {
 			c += dir
 		}
 		if c >= 0 && c < len(m.side) {
@@ -693,8 +583,8 @@ func (m *Model) ask(prompt string, fn func(*Model)) {
 func (m *Model) startAdd() {
 	m.mode, m.editing = modeAdd, nil
 	// Pre-fill the project/context selected in the sidebar.
-	if e := m.currentEntry(); e.kind == entryProject || e.kind == entryContext {
-		m.startInput(" "+e.value, 0)
+	if e := m.currentEntry(); e.Kind == entryProject || e.Kind == entryContext {
+		m.startInput(" "+e.Value, 0)
 		return
 	}
 	m.startInput("", -1)

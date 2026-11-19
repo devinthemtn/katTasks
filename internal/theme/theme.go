@@ -112,6 +112,14 @@ var Builtins = []Theme{
 		"pri_a": "#FB4934", "pri_b": "#FE8019", "pri_c": "#FABD2F", "pri_d": "#D3869B", "pri_other": "#8EC07C",
 		"due": "#FABD2F", "today": "#FE8019", "overdue": "#FB4934", "done": "#928374", "ok": "#B8BB26", "error": "#FB4934",
 	})},
+	// Dracula: https://draculatheme.com (MIT).
+	{Name: "dracula", Colors: plain(map[string]string{
+		"fg": "#F8F8F2", "dim": "#6272A4", "accent": "#BD93F9", "border": "#44475A", "border_focus": "#BD93F9",
+		"cursor_bg": "#44475A", "selected_bg": "#4B3F66", "match_bg": "#6B5F2A", "title_fg": "#282A36", "title_bg": "#BD93F9",
+		"project": "#50FA7B", "context": "#8BE9FD", "tag": "#6272A4",
+		"pri_a": "#FF5555", "pri_b": "#FFB86C", "pri_c": "#F1FA8C", "pri_d": "#FF79C6", "pri_other": "#8BE9FD",
+		"due": "#F1FA8C", "today": "#FFB86C", "overdue": "#FF5555", "done": "#6272A4", "ok": "#50FA7B", "error": "#FF5555",
+	})},
 }
 
 func plain(m map[string]string) map[string]Color {

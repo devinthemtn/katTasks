@@ -91,7 +91,7 @@ Mistakes are shown in the footer until fixed, and the default is used for
 that setting.
 
 ```toml
-theme = "default"            # default | terminal | nord | gruvbox | a file in themes/
+theme = "default"            # default | terminal | nord | gruvbox | dracula | a file in themes/
 
 [files]
 todo = "~/todo.txt"          # ~ and $VARS are expanded
@@ -312,8 +312,8 @@ kat.add(t.text:gsub("due:%S+", "") .. " due:" .. kat.date("+1w"))
 ## Themes
 
 Built in: `default`, which adapts to light and dark terminals; `terminal`,
-which uses only your terminal's 16 colors; `nord`; and `gruvbox`. Press `T` to
-pick one. The choice is saved to `theme` in config.toml.
+which uses only your terminal's 16 colors; `nord`; `gruvbox`; and
+[`dracula`](https://draculatheme.com). Press `T` to pick one. The choice is saved to `theme` in config.toml.
 
 Any `themes/NAME.toml` next to config.toml adds a theme called `NAME`. If it
 has the same name as a built-in, it replaces it. `katTasks -maketheme NAME`

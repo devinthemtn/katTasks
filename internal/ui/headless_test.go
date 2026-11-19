@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/devinthemtn/katTasks/internal/theme"
 )
 
 func TestParseKeyMsgRoundTrip(t *testing.T) {
@@ -128,5 +130,19 @@ func TestCSSColor(t *testing.T) {
 		if got := cssColor(in); got != want {
 			t.Errorf("cssColor(%q) = %q, want %q", in, got, want)
 		}
+	}
+}
+
+func TestCSSColorsBackground(t *testing.T) {
+	themes, _ := theme.Load(t.TempDir())
+	for name, want := range map[string]string{"dracula": "#282A36", "nord": "#2E3440"} {
+		th, _ := theme.Find(themes, name)
+		if c := cssColors(th); c.Dark["bg"] != want || c.Light["bg"] != want {
+			t.Errorf("%s: bg %q / %q, want %q", name, c.Light["bg"], c.Dark["bg"], want)
+		}
+	}
+	th, _ := theme.Find(themes, "default")
+	if c := cssColors(th); c.Light["bg"] != "#FFFFFF" || c.Dark["bg"] != "#18181F" {
+		t.Errorf("default: bg %q / %q", c.Light["bg"], c.Dark["bg"])
 	}
 }

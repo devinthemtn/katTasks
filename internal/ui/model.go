@@ -161,7 +161,7 @@ func (m *Model) applyConfig(cfg config.Config) []error {
 	errs = append(errs, warns...)
 	m.themes = themes
 	if !m.useTheme(cfg.Theme) {
-		errs = append(errs, fmt.Errorf("theme = %q: no such theme (built-in: default, terminal, nord, gruvbox; or a file in %s)", cfg.Theme, theme.Dir(cfg.Dir())))
+		errs = append(errs, fmt.Errorf("theme = %q: no such theme (built-in: default, terminal, nord, gruvbox, dracula; or a file in %s)", cfg.Theme, theme.Dir(cfg.Dir())))
 		m.useTheme("default")
 	}
 	m.loadScripts()

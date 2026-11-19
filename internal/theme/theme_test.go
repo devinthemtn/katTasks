@@ -48,7 +48,7 @@ func TestLoadCustom(t *testing.T) {
 	for _, th := range themes {
 		names = append(names, th.Name)
 	}
-	if got := strings.Join(names, ","); got != "default,terminal,gruvbox,child,mine,nord" {
+	if got := strings.Join(names, ","); got != "default,terminal,gruvbox,dracula,child,mine,nord" {
 		t.Errorf("themes = %s", got)
 	}
 	w := ""

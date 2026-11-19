@@ -413,8 +413,9 @@ func (m Model) helpCols() []HelpCol {
 // ---- colors --------------------------------------------------------------------
 
 // cssColors resolves a theme for light and dark windows. Terminal themes
-// have no background color, so one is chosen: the usual white or near-black
-// for themes that adapt, and a shade of the cursor row for fixed dark ones.
+// have no background color, so one is chosen: the background a built-in dark
+// theme was made for, the usual white or near-black for themes that adapt,
+// and a shade of the cursor row for other fixed dark ones.
 func cssColors(t theme.Theme) Colors {
 	c := Colors{Light: map[string]string{}, Dark: map[string]string{}}
 	for _, f := range theme.Fields {
@@ -422,6 +423,10 @@ func cssColors(t theme.Theme) Colors {
 		c.Light[f.Key], c.Dark[f.Key] = cssColor(col.Light), cssColor(col.Dark)
 	}
 	c.Light["bg"], c.Dark["bg"] = "#FFFFFF", "#18181F"
+	if bg, ok := builtinBg[t.Name]; ok && t.File == "" {
+		c.Light["bg"], c.Dark["bg"] = bg, bg
+		return c
+	}
 	fg := t.Get("fg")
 	if fg.Light == fg.Dark && fg.Dark != "" {
 		if lum(cssColor(fg.Dark)) > 0.5 {
@@ -436,6 +441,9 @@ func cssColors(t theme.Theme) Colors {
 	}
 	return c
 }
+
+// builtinBg are the backgrounds the built-in dark themes were designed on.
+var builtinBg = map[string]string{"nord": "#2E3440", "gruvbox": "#282828", "dracula": "#282A36"}
 
 // ansi16 are xterm's first sixteen colors.
 var ansi16 = [16]string{

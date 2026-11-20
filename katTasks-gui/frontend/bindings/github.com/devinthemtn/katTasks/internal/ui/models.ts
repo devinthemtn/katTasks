@@ -344,6 +344,11 @@ export interface Snapshot {
     "confirm": string;
 
     /**
+     * ConfirmNo: its "no" button is highlighted, so enter answers no.
+     */
+    "confirmNo": boolean;
+
+    /**
      * the two status lines
      */
     "footer": (Seg[] | null)[];

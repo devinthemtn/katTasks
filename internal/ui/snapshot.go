@@ -33,10 +33,12 @@ type Snapshot struct {
 	Empty string    `json:"empty"` // shown when the list is empty
 	NumW  int       `json:"numW"`  // width of line numbers; 0 = off
 
-	Input   *Input    `json:"input"`   // the text being typed, if any
-	Confirm string    `json:"confirm"` // the y/n question, in confirm mode
-	Footer  [2][]Seg  `json:"footer"`  // the two status lines
-	Help    []HelpCol `json:"help"`    // the help screen's keys, when open
+	Input   *Input `json:"input"`   // the text being typed, if any
+	Confirm string `json:"confirm"` // the y/n question, in confirm mode
+	// ConfirmNo: its "no" button is highlighted, so enter answers no.
+	ConfirmNo bool      `json:"confirmNo"`
+	Footer    [2][]Seg  `json:"footer"` // the two status lines
+	Help      []HelpCol `json:"help"`   // the help screen's keys, when open
 	// HelpTyping and HelpTags are its WHILE TYPING and TAGS & SEARCH lines.
 	HelpTyping []string `json:"helpTyping"`
 	HelpTags   []string `json:"helpTags"`
@@ -187,7 +189,7 @@ func (m Model) Snapshot() Snapshot {
 	case modeAdd, modeEdit, modeFilter, modeSaveName, modePalette:
 		s.Input = m.inputState()
 	case modeConfirm:
-		s.Confirm = m.confirm
+		s.Confirm, s.ConfirmNo = m.confirm, m.confirmNo
 	case modeTheme:
 		for _, t := range m.themes {
 			r := ThemeRow{Name: t.Name}

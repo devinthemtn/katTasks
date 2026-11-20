@@ -349,8 +349,8 @@
     </div>
 
     {#snippet popupButtons()}
-      <button class="btn primary" onclick={() => key('enter')}><span>Save</span><kbd>enter</kbd></button>
-      <button class="btn" onclick={() => key('esc')}><span>Cancel</span><kbd>esc</kbd></button>
+      <button class="btn pos on" onclick={() => key('enter')}><span>Save</span><kbd>enter</kbd></button>
+      <button class="btn neg" onclick={() => key('esc')}><span>Cancel</span><kbd>esc</kbd></button>
       <button class="btn" onclick={() => key('tab')}><span>Complete</span><kbd>tab</kbd></button>
       <span class="dim">&nbsp;<span class="bold">←→↑↓</span> choose</span>
     {/snippet}
@@ -409,8 +409,8 @@
               {/if}
             </div>
             <div class="line btnline">
-              <button class="btn primary" onclick={() => key('enter')}><span>{a.kind === 'due' ? 'Set due date' : 'Set alarm'}</span><kbd>enter</kbd></button>
-              <button class="btn" onclick={() => key('esc')}><span>Cancel</span><kbd>esc</kbd></button>
+              <button class="btn pos on" onclick={() => key('enter')}><span>{a.kind === 'due' ? 'Set due date' : 'Set alarm'}</span><kbd>enter</kbd></button>
+              <button class="btn neg" onclick={() => key('esc')}><span>Cancel</span><kbd>esc</kbd></button>
               <span class="dim">&nbsp;tab date / time</span>
             </div>
           {:else}
@@ -429,8 +429,9 @@
           <div class="line prompt wrap">{s.confirm}</div>
           <div class="line">&nbsp;</div>
           <div class="line btnline">
-            <button class="btn primary" onclick={() => key('y')}><span>Yes</span><kbd>y</kbd></button>
-            <button class="btn" onclick={() => key('n')}><span>No</span><kbd>n</kbd></button>
+            <button class="btn pos" class:on={!s.confirmNo} onclick={() => key('y')}><span>Yes</span><kbd>y</kbd></button>
+            <button class="btn neg" class:on={s.confirmNo} onclick={() => key('n')}><span>No</span><kbd>n</kbd></button>
+            <span class="dim">&nbsp;<span class="bold">←→</span> choose · <span class="bold">enter</span> ok</span>
           </div>
         </div>
       </div>

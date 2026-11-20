@@ -403,3 +403,29 @@ func TestSuggestionArrowsAndEnter(t *testing.T) {
 		t.Fatalf("second enter kept the input open: %+v", s.Input)
 	}
 }
+
+func TestConfirmButtons(t *testing.T) {
+	h, _ := headless(t)
+	h.m.ask("delete it?", func(m *Model) { m.setStatus("deleted") })
+	s := h.State()
+	if s.Mode != "confirm" || s.ConfirmNo {
+		t.Fatalf("yes should be highlighted first: %+v", s.Mode)
+	}
+	if s = h.Key("enter"); s.Mode != "normal" || h.m.status != "deleted" {
+		t.Fatalf("enter on yes: mode %s, status %q", s.Mode, h.m.status)
+	}
+
+	h.m.ask("delete it?", func(m *Model) { m.setStatus("deleted") })
+	if s = h.Key("right"); !s.ConfirmNo {
+		t.Fatal("right should highlight no")
+	}
+	if s = h.Key("enter"); s.Mode != "normal" || h.m.status != "cancelled" {
+		t.Fatalf("enter on no: mode %s, status %q", s.Mode, h.m.status)
+	}
+
+	h.m.ask("delete it?", func(m *Model) { m.setStatus("deleted") })
+	h.Key("tab")
+	if s = h.Key("y"); h.m.status != "deleted" {
+		t.Fatalf("y answers yes whatever is highlighted: %q", h.m.status)
+	}
+}

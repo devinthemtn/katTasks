@@ -387,7 +387,13 @@ func (m Model) viewFooter() string {
 		}
 	case modeConfirm:
 		l1 = m.st.prompt.Render(" " + m.confirm)
-		l2 = ""
+		yes, no := m.st.suggest.Render(" y yes "), m.st.suggest.Render(" n no ")
+		if m.confirmNo {
+			no = m.st.suggestOn.Render("n no")
+		} else {
+			yes = m.st.suggestOn.Render("y yes")
+		}
+		l2 = " " + yes + "  " + no + m.st.faint.Render("   ←→ choose · enter ok")
 	case modePriority:
 		l1 = m.st.prompt.Render(" priority › ") + m.st.faint.Render("press A–Z, space to clear, esc to cancel")
 	case modeTheme:

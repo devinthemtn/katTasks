@@ -87,6 +87,7 @@ type Model struct {
 	choice    *scriptChoice // a script's kat.choose list, over the task popup
 	suggIdx   int
 	confirm   string
+	confirmNo bool // the question's "no" button is highlighted
 	onConfirm func(*Model)
 
 	status     string
@@ -457,13 +458,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateThemePicker(msg)
 			return m, nil
 		case modeConfirm:
-			if s := strings.ToLower(msg.String()); s == "y" {
-				m.mode = modeNormal
-				m.onConfirm(&m)
-			} else {
-				m.mode = modeNormal
-				m.setStatus("cancelled")
-			}
+			m.updateConfirm(msg)
 			return m, nil
 		}
 		return m.updateNormal(msg)
@@ -594,7 +589,28 @@ func (m *Model) move(how moveKind) {
 }
 
 func (m *Model) ask(prompt string, fn func(*Model)) {
-	m.mode, m.confirm, m.onConfirm = modeConfirm, prompt, fn
+	m.mode, m.confirm, m.onConfirm, m.confirmNo = modeConfirm, prompt, fn, false
+}
+
+// updateConfirm answers the y/n question: y or n, or enter on the button
+// that's highlighted (yes, until ←→ or tab moves it). Any other key is no.
+func (m *Model) updateConfirm(msg tea.KeyMsg) {
+	k := strings.ToLower(msg.String())
+	switch k {
+	case "left", "right", "h", "l", "tab", "shift+tab":
+		m.confirmNo = !m.confirmNo
+		return
+	case "enter":
+		if !m.confirmNo {
+			k = "y"
+		}
+	}
+	m.mode = modeNormal
+	if k == "y" {
+		m.onConfirm(m)
+	} else {
+		m.setStatus("cancelled")
+	}
 }
 
 func (m *Model) startAdd() {

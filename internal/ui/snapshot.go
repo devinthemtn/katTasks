@@ -118,6 +118,15 @@ type Input struct {
 	Hint     string   `json:"hint"`
 	// Alarm is the alarm: date and time picker, when it's open.
 	Alarm *AlarmPicker `json:"alarm"`
+	// Choice is the list a /script asked for with kat.choose, when it's open.
+	Choice *Choice `json:"choice"`
+}
+
+// Choice is a /script's kat.choose list.
+type Choice struct {
+	Prompt  string   `json:"prompt"`
+	Options []string `json:"options"`
+	Idx     int      `json:"idx"` // the highlighted option
 }
 
 // HelpCol is a column of the help screen.
@@ -338,6 +347,9 @@ func dueKey(k listview.DueKind) string {
 
 func (m Model) inputState() *Input {
 	in := &Input{Value: m.input.Value(), Pos: m.input.Position(), SuggIdx: m.suggIdx, Alarm: m.alarmPickerState()}
+	if c := m.choice; c != nil {
+		in.Choice = &Choice{Prompt: c.prompt, Options: c.options, Idx: c.idx}
+	}
 	switch m.mode {
 	case modeAdd:
 		in.Label = "New task"

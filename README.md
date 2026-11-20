@@ -209,6 +209,8 @@ keys one after the other, within 600 ms.
 | `palette` | `:` `ctrl+p` | fuzzy-search every action, and your saved searches |
 | `reload` | `r` | re-read todo.txt from disk |
 | `reload_config` | `ctrl+r` | re-read the settings |
+| `settings` | (none; `:settings`) | open the settings file in your editor, then re-read it when the editor closes |
+| `config` | (none; `:config`) | open the settings folder (themes, scripts) in your editor, then re-read the settings |
 | `help` | `?` | all keys, what to type in a task, and the tags and search terms; `j` `k`, `pgup` `pgdn`, `g` `G` scroll it when it doesn't fit |
 | `quit` | `q` | quit (`ctrl+c` always quits) |
 

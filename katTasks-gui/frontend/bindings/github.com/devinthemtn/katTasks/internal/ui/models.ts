@@ -175,6 +175,19 @@ export interface CalendarItem {
 }
 
 /**
+ * Choice is a /script's kat.choose list.
+ */
+export interface Choice {
+    "prompt": string;
+    "options": string[] | null;
+
+    /**
+     * the highlighted option
+     */
+    "idx": number;
+}
+
+/**
  * Colors are a theme's colors as CSS hex, for light and dark windows: the
  * theme's color keys plus "bg", the window background. "" is the default.
  */
@@ -227,6 +240,11 @@ export interface Input {
      * Alarm is the alarm: date and time picker, when it's open.
      */
     "alarm": AlarmPicker | null;
+
+    /**
+     * Choice is the list a /script asked for with kat.choose, when it's open.
+     */
+    "choice": Choice | null;
 }
 
 /**

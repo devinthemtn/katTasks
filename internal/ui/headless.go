@@ -35,7 +35,7 @@ type Headless struct {
 
 // NewHeadless loads settings and the todo file as New does.
 func NewHeadless(m Model, hop HeadlessOptions) *Headless {
-	m.copyFn = hop.Copy
+	m.copyFn, m.windowed = hop.Copy, true
 	if m.width == 0 {
 		m.width, m.height = 100, 30
 	}
@@ -241,7 +241,8 @@ func (h *Headless) Run(name string) Snapshot {
 }
 
 // Pick chooses row index of the open list: a command palette entry, a
-// theme, a completion, a calendar day or an alarm picker day. With commit it also runs, saves,
+// theme, a completion, a calendar day, an alarm picker day or an option of
+// a script's kat.choose list. With commit it also runs, saves,
 // accepts or opens it.
 func (h *Headless) Pick(index int, commit bool) Snapshot {
 	return h.do(func(m *Model) tea.Cmd {
@@ -251,6 +252,14 @@ func (h *Headless) Pick(index int, commit bool) Snapshot {
 		case m.mode == modeTheme && index >= 0 && index < len(m.themes):
 			m.pickIdx = index
 			m.useTheme(m.themes[index].Name)
+		case (m.mode == modeAdd || m.mode == modeEdit) && m.choice != nil:
+			if index >= 0 && index < len(m.choice.options) {
+				m.choice.idx = index // a /script's kat.choose list; commit picks it
+				if commit {
+					m.answerChoice(m.choice.options[index])
+				}
+			}
+			return nil
 		case (m.mode == modeAdd || m.mode == modeEdit) && m.pick != nil:
 			m.pickDay(index) // a day of the alarm picker; commit sets it
 			if commit {

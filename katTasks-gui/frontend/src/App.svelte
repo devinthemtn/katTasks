@@ -416,6 +416,19 @@
               <button class="btn neg" onclick={() => key('esc')}><span>Cancel</span><kbd>esc</kbd></button>
               <span class="dim">&nbsp;tab date / time</span>
             </div>
+          {:else if s.input.choice}
+            {@const c = s.input.choice}
+            <div class="line prompt">{c.prompt}</div>
+            <div class="line">&nbsp;</div>
+            {#each c.options ?? [] as o, i}
+              <div class="line choicerow" class:sel={i === c.idx} onclick={() => pick(i, true)} role="button" tabindex="-1"><span class="dim">&nbsp;{i + 1}&nbsp;&nbsp;</span>{o}</div>
+            {/each}
+            <div class="line">&nbsp;</div>
+            <div class="line btnline">
+              <button class="btn pos on" onclick={() => key('enter')}><span>Pick</span><kbd>enter</kbd></button>
+              <button class="btn neg" onclick={() => key('esc')}><span>Cancel</span><kbd>esc</kbd></button>
+              <span class="dim">&nbsp;<span class="bold">↑↓</span> choose · <span class="bold">1–{c.options?.length ?? 0}</span> or first letter picks</span>
+            </div>
           {:else}
             {#each popupHelp as l}<div class="line"><Text segs={l} /></div>{/each}
             <div class="line">&nbsp;</div>

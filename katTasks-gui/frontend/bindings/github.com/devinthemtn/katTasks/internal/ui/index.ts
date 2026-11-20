@@ -9,6 +9,7 @@ export type {
     Calendar,
     CalendarDay,
     CalendarItem,
+    Choice,
     Colors,
     HelpCol,
     HelpRow,

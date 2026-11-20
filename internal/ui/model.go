@@ -115,6 +115,8 @@ type Model struct {
 	width, height int
 
 	copyFn func(string) error // the desktop app's clipboard; nil in a terminal
+	// windowed: run by katTasks-gui, with no terminal to hand an editor
+	windowed bool
 }
 
 // Options configure New.
@@ -411,6 +413,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.fitInput()
 		m.clampCursor()
+		return m, nil
+	case editorDoneMsg:
+		m.editorDone(msg)
 		return m, nil
 	case chordTimeoutMsg:
 		return m, m.chordTimedOut(msg)

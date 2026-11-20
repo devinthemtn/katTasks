@@ -262,6 +262,12 @@ button {
 .agitem.marked { background: var(--selected-bg); }
 .agitem:hover:not(.cur) { background: color-mix(in srgb, var(--cursor-bg) 70%, var(--bg)); }
 
+/* A /script's kat.choose list in the task popup. */
+.choicerow { padding: 0 1ch; border-radius: 0.3em; cursor: pointer; }
+.choicerow:hover:not(.sel) { background: color-mix(in srgb, var(--cursor-bg) 45%, transparent); }
+.choicerow.sel { color: var(--title-fg); background: var(--accent); font-weight: bold; }
+.choicerow.sel .dim { color: inherit; }
+
 /* The alarm: date and time picker in the task popup. */
 .sugg-on { background: var(--selected-bg); padding: 0 1ch; }
 .alarm-pick { display: flex; gap: 4ch; align-items: flex-start; }

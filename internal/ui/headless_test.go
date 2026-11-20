@@ -495,3 +495,27 @@ func TestPickerOpensOnBatchedTyping(t *testing.T) {
 		}
 	}
 }
+
+// katTasks-gui sees a /script's kat.choose list, and a click picks from it.
+func TestHeadlessChooseList(t *testing.T) {
+	src := `local p = kat.choose("Priority", {"A", "B", "C"})
+if not p then return nil end
+kat.replace("(" .. p .. ") " .. kat.input)`
+	h := NewHeadless(scriptModel(t, map[string]string{"pri": src}), HeadlessOptions{})
+	keys(h, "a")
+	for _, r := range "Call mom /pri" {
+		h.Key(string(r))
+	}
+	s := h.Key("tab")
+	c := s.Input.Choice
+	if c == nil || c.Prompt != "Priority" || strings.Join(c.Options, "") != "ABC" || c.Idx != 0 {
+		t.Fatalf("choice list in the snapshot: %+v", c)
+	}
+	if s = h.Key("down"); s.Input.Choice.Idx != 1 {
+		t.Fatalf("down: idx %d", s.Input.Choice.Idx)
+	}
+	s = h.Pick(2, true) // click C
+	if s.Input.Choice != nil || !strings.HasPrefix(s.Input.Value, "(C) Call mom") {
+		t.Fatalf("after clicking C: %q, list %+v", s.Input.Value, s.Input.Choice)
+	}
+}

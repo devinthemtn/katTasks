@@ -409,7 +409,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.input.Width = msg.Width - 12
+		m.fitInput()
 		m.clampCursor()
 		return m, nil
 	case chordTimeoutMsg:
@@ -623,7 +623,22 @@ func (m *Model) startAdd() {
 	m.startInput("", -1)
 }
 
+// popupWidth is the width inside the add/edit popup's border and padding.
+func (m Model) popupWidth() int { return clamp(m.width-4, 20, 64) }
+
+// fitInput sizes the input to the box it's drawn in (the add/edit popup,
+// or the footer), so it scrolls its text to keep the cursor in view there.
+func (m *Model) fitInput() {
+	if m.mode == modeAdd || m.mode == modeEdit {
+		m.input.Width = m.popupWidth() - 3 // "› " prompt plus the cursor cell
+	} else {
+		m.input.Width = m.width - 12
+	}
+	m.input.SetCursor(m.input.Position()) // rescroll for the new width
+}
+
 func (m *Model) startInput(val string, cursor int) {
+	m.fitInput()
 	m.input.SetValue(val)
 	if cursor < 0 {
 		m.input.CursorEnd()
@@ -713,7 +728,10 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
-	if _, w := m.wordAtCursor(); (m.mode == modeAdd || m.mode == modeEdit) && msg.String() == ":" {
+	// A terminal sends fast typing as one message ("due:" or "e:"), so look
+	// at the last rune typed, not the whole message. A paste doesn't count.
+	typedColon := msg.Type == tea.KeyRunes && !msg.Paste && len(msg.Runes) > 0 && msg.Runes[len(msg.Runes)-1] == ':'
+	if _, w := m.wordAtCursor(); (m.mode == modeAdd || m.mode == modeEdit) && typedColon {
 		switch {
 		case strings.EqualFold(w, "alarm:"):
 			m.openAlarmPicker()

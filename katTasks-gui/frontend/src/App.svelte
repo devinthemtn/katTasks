@@ -172,9 +172,12 @@
       void s?.input?.pos; void s?.input?.value;
       const c = el.querySelector('.caret') as HTMLElement | null;
       if (!c) return;
-      const right = c.offsetLeft + c.offsetWidth - el.clientWidth;
-      if (right > el.scrollLeft) el.scrollLeft = right + cw * 4;
-      else if (c.offsetLeft < el.scrollLeft) el.scrollLeft = Math.max(0, c.offsetLeft - cw * 4);
+      // Where the cursor is in the text, in px from its start. (offsetLeft
+      // would count from the popup's overlay, not from this box.)
+      const x = c.getBoundingClientRect().left - el.getBoundingClientRect().left + el.scrollLeft;
+      const margin = Math.min(cw * 4, el.clientWidth / 4);
+      if (x + c.offsetWidth > el.scrollLeft + el.clientWidth - margin) el.scrollLeft = x + c.offsetWidth - el.clientWidth + margin;
+      else if (x < el.scrollLeft + margin) el.scrollLeft = Math.max(0, x - margin);
     });
   }
 

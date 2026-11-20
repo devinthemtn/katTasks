@@ -38,7 +38,7 @@ func (m Model) View() string {
 	}
 	body := m.viewBody()
 	if m.mode == modeAdd || m.mode == modeEdit {
-		body = overlay(body, m.viewTaskPopup(m.width))
+		body = overlay(body, m.viewTaskPopup())
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, m.viewHeader(), body, m.viewFooter())
 }

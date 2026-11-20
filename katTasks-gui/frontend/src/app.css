@@ -111,7 +111,7 @@ html, body, #app { margin: 0; height: 100%; overflow: hidden; }
 .helprow .keys { min-width: 12ch; }
 
 /* text inputs, with a block cursor */
-.input { white-space: pre; overflow: hidden; display: inline-block; vertical-align: bottom; max-width: 100%; cursor: text; }
+.input { position: relative; white-space: pre; overflow: hidden; display: inline-block; vertical-align: bottom; max-width: 100%; cursor: text; }
 .input.grow { flex: 1 1 auto; }
 .footer .line:first-child, .popup .line:nth-child(3) { display: flex; }
 .caret { background: var(--fg); color: var(--bg); }

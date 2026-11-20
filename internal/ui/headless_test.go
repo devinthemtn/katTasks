@@ -1,6 +1,7 @@
 package ui
 
 import (
+	tea "github.com/charmbracelet/bubbletea"
 	"os"
 	"strings"
 	"testing"
@@ -427,5 +428,70 @@ func TestConfirmButtons(t *testing.T) {
 	h.Key("tab")
 	if s = h.Key("y"); h.m.status != "deleted" {
 		t.Fatalf("y answers yes whatever is highlighted: %q", h.m.status)
+	}
+}
+
+func TestDuePickerOnLongTask(t *testing.T) {
+	long := strings.Repeat("a long task about many things ", 6) + "end"
+	typeIt := func(h *Headless, text string) (s Snapshot) {
+		for _, r := range text {
+			s = h.Key(string(r))
+		}
+		return s
+	}
+	h, _ := headless(t)
+	keys(h, "a")
+	s := typeIt(h, long+" due:")
+	if s.Input == nil || s.Input.Alarm == nil || s.Input.Alarm.Kind != "due" {
+		t.Fatalf("add: due: at the end of a long task didn't open the calendar: %+v", s.Input)
+	}
+	s = keys(h, "enter", "enter") // set the date, then save
+	if s.Mode != "normal" {
+		t.Fatalf("mode %s after saving", s.Mode)
+	}
+
+	// Edit the long task: the cursor starts at the end.
+	h, _ = headless(t)
+	keys(h, "a")
+	typeIt(h, long)
+	keys(h, "enter", "e")
+	s = typeIt(h, " due:")
+	if s.Input == nil || s.Input.Alarm == nil || s.Input.Alarm.Kind != "due" {
+		t.Fatalf("edit: due: at the end of a long task didn't open the calendar: %+v", s.Input)
+	}
+}
+
+// A long line scrolls inside the terminal's add popup instead of wrapping
+// onto more lines, while typing and when moving back to the start.
+func TestPopupInputFitsLongText(t *testing.T) {
+	m := scriptModel(t, nil)
+	mm, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	m = mm.(Model)
+	m.startAdd()
+	want := strings.Count(m.viewTaskPopup(), "\n")
+	m = typeText(m, strings.Repeat("a long task about many things ", 6))
+	if got := strings.Count(m.viewTaskPopup(), "\n"); got != want {
+		t.Fatalf("typing: popup is %d lines, want %d:\n%s", got+1, want+1, m.viewTaskPopup())
+	}
+	m = press(m, tea.KeyHome)
+	if got := strings.Count(m.viewTaskPopup(), "\n"); got != want {
+		t.Fatalf("home: popup is %d lines, want %d:\n%s", got+1, want+1, m.viewTaskPopup())
+	}
+}
+
+// A terminal can send fast typing as one message; due: and alarm: still
+// open their pickers.
+func TestPickerOpensOnBatchedTyping(t *testing.T) {
+	for _, tc := range []struct{ typed, batch string }{
+		{"some task ", "due:"}, {"some task du", "e:"}, {"some task ", "alarm:"},
+	} {
+		m := scriptModel(t, nil)
+		m.startAdd()
+		m = typeText(m, tc.typed)
+		mm, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(tc.batch)})
+		m = mm.(Model)
+		if wantDue := tc.batch != "alarm:"; m.pick == nil || m.pick.due != wantDue {
+			t.Errorf("%q then %q as one message: value %q, no %s picker", tc.typed, tc.batch, m.input.Value(), map[bool]string{true: "due", false: "alarm"}[wantDue])
+		}
 	}
 }

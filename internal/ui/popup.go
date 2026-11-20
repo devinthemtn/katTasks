@@ -9,19 +9,17 @@ import (
 
 // viewTaskPopup renders the centered box used to add or edit a task: the
 // input, any completions, and a short reminder of the todo.txt syntax.
-func (m Model) viewTaskPopup(maxW int) string {
-	w := clamp(maxW-4, 20, 64) // content width inside border and padding
+func (m Model) viewTaskPopup() string {
+	w := m.popupWidth()
 	title := "New task"
 	if m.mode == modeEdit {
 		title = "Edit task"
 	}
 
-	in := m.input
-	in.Width = w - 3 // "› " prompt plus the cursor cell
 	lines := []string{
 		m.st.prompt.Render(title),
 		"",
-		m.st.prompt.Render("› ") + in.View(),
+		m.st.prompt.Render("› ") + m.input.View(),
 	}
 	if len(m.sugg) > 0 {
 		var ss []string

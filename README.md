@@ -228,7 +228,8 @@ Keys are written like `ctrl+u`, `alt+x`, `shift+tab`, `enter`, `esc`, `space`,
 Adding (`a`) or editing a task opens a small box in the middle of the screen,
 with a reminder of the `(A)`, `+project`, `@context`, `due:`, `rec:`,
 `alarm:`, `at:` and `status:` / `progress:` syntax underneath. While typing a
-task, `tab` completes `+project`, `@context`, `due:`, `rec:` and `at:` words.
+task, `tab` (or `enter`) completes `+project`, `@context`, `due:`, `rec:` and
+`at:` words; `←→` or `↑↓` choose among the suggestions.
 `at:` offers the next half hours, and the times that fit what you've typed
 (`at:9` → `at:900`, `at:915`…; `at:3p` → `at:3pm`). Typing `alarm:` opens a
 [date and time picker](#alarms).

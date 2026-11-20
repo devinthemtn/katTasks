@@ -27,8 +27,7 @@ html, body, #app { margin: 0; height: 100%; overflow: hidden; }
 .prompt { color: var(--accent); font-weight: bold; }
 .chip { color: var(--title-fg); background: var(--accent); padding: 0 1ch; }
 .sugg { padding: 0; }
-.action, [role="button"], button { cursor: pointer; }
-.action:hover { text-decoration: underline; }
+[role="button"], button { cursor: pointer; }
 
 .c-fg { color: var(--fg); }
 .c-dim { color: var(--dim); }
@@ -130,7 +129,6 @@ html, body, #app { margin: 0; height: 100%; overflow: hidden; }
 }
 .popup.confirm { width: min(60ch, calc(100vw - 6ch)); }
 .rule { border-top: 1px solid var(--dim); margin: 0.5lh 0; }
-.buttons { display: flex; gap: 2ch; }
 button {
   font: inherit;
   color: inherit;
@@ -138,8 +136,36 @@ button {
   border: none;
   padding: 0 1ch;
 }
-button.sugg { color: var(--dim); }
-button.sugg:hover { color: var(--fg); }
+
+/* Real buttons: a label, then the key that does the same thing. */
+.btnline { display: flex; align-items: center; gap: 1ch; padding: 0.3lh 0; overflow: visible; flex-wrap: wrap; }
+.footer .btnline { padding: 0.2lh 0.5ch 0.3lh 0; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 1ch;
+  padding: 0.15lh 1.2ch;
+  line-height: 1.2;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--border) 22%, var(--bg));
+  border: 1px solid color-mix(in srgb, var(--border) 80%, var(--fg) 20%);
+  border-radius: 0.45em;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 25%);
+  transition: background 0.1s, border-color 0.1s, transform 0.05s;
+}
+.btn:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
+.btn:active { transform: translateY(1px); box-shadow: none; }
+.btn kbd {
+  font: inherit;
+  font-size: 0.8em;
+  color: var(--dim);
+  padding: 0 0.6ch;
+  border: 1px solid color-mix(in srgb, var(--dim) 50%, transparent);
+  border-radius: 0.3em;
+}
+.btn.primary { color: var(--title-fg); background: var(--accent); border-color: var(--accent); font-weight: bold; }
+.btn.primary:hover { background: color-mix(in srgb, var(--accent) 85%, var(--fg)); }
+.btn.primary kbd { color: inherit; border-color: color-mix(in srgb, var(--title-fg) 45%, transparent); font-weight: normal; }
 
 .prichips {
   position: fixed;

@@ -1,9 +1,8 @@
 <script lang="ts">
-  // A line of styled text pieces from the task list (Seg). Pieces that name
-  // an action run it when clicked.
+  // A line of styled text pieces from the task list (Seg).
   import type { Seg } from '../bindings/github.com/devinthemtn/katTasks/internal/ui/models';
 
-  let { segs, onclick }: { segs: Seg[]; onclick?: (action: string) => void } = $props();
+  let { segs }: { segs: Seg[] } = $props();
 
   function cls(style: string | undefined) {
     switch (style) {
@@ -18,4 +17,4 @@
   }
 </script>
 
-{#each segs as g}{#if g.action && onclick}<span class="{cls(g.style)} action" onclick={() => onclick(g.action!)} role="button" tabindex="-1">{g.text}</span>{:else}<span class={cls(g.style)}>{g.text}</span>{/if}{/each}
+{#each segs as g}<span class={cls(g.style)}>{g.text}</span>{/each}

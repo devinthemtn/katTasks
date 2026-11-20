@@ -375,3 +375,31 @@ func TestHelpScrolls(t *testing.T) {
 		t.Error("j didn't close a help screen that fits")
 	}
 }
+
+func TestSuggestionArrowsAndEnter(t *testing.T) {
+	h, _ := headless(t)
+	s := keys(h, "a")
+	for _, r := range "Lunch at:9" {
+		s = h.Key(string(r))
+	}
+	if s.Input.SuggIdx != 0 || len(s.Input.Sugg) < 2 {
+		t.Fatalf("suggestions %q at %d", s.Input.Sugg, s.Input.SuggIdx)
+	}
+	if s = h.Key("right"); s.Input.SuggIdx != 1 {
+		t.Fatalf("right: at %d", s.Input.SuggIdx)
+	}
+	if s = h.Key("left"); s.Input.SuggIdx != 0 {
+		t.Fatalf("left: at %d", s.Input.SuggIdx)
+	}
+	if s = h.Key("left"); s.Input.SuggIdx != len(s.Input.Sugg)-1 {
+		t.Fatalf("left wraps: at %d", s.Input.SuggIdx)
+	}
+	pick := s.Input.Sugg[s.Input.SuggIdx]
+	s = h.Key("enter") // completes, doesn't save
+	if s.Input == nil || s.Input.Value != "Lunch "+pick+" " {
+		t.Fatalf("enter: input %+v, want %q completed", s.Input, pick)
+	}
+	if s = h.Key("enter"); s.Input != nil { // no suggestions now: saves
+		t.Fatalf("second enter kept the input open: %+v", s.Input)
+	}
+}

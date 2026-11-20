@@ -66,7 +66,7 @@ func (m Model) viewTaskPopup(maxW int) string {
 		key("/name ") + m.st.faint.Render("run a Lua script from scripts/"),
 		"",
 		key("enter") + m.st.faint.Render(" save · ") + key("esc") + m.st.faint.Render(" cancel · ") +
-			key("tab") + m.st.faint.Render(" complete · ") + key("↑↓") + m.st.faint.Render(" choose"),
+			key("tab") + m.st.faint.Render(" complete · ") + key("←→↑↓") + m.st.faint.Render(" choose"),
 	}
 	lines = append(lines, m.st.faint.Render(strings.Repeat("─", w)))
 	for _, l := range help {

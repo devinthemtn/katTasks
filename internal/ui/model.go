@@ -655,6 +655,12 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.input.Blur()
 		return m, nil
 	case "enter":
+		// Like tab while the list is showing; a /script word still runs
+		// and saves, below.
+		if (m.mode == modeAdd || m.mode == modeEdit) && len(m.sugg) > 0 && !m.isScriptSuggestion() {
+			m.acceptSuggestion()
+			return m, nil
+		}
 		if (m.mode == modeAdd || m.mode == modeEdit) && !m.expandScripts() {
 			if m.choice != nil {
 				m.choice.submit = true // save once it's answered
@@ -677,13 +683,15 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case "down", "ctrl+n":
-		if len(m.sugg) > 0 {
-			m.suggIdx = (m.suggIdx + 1) % len(m.sugg)
+		if m.moveSugg(1) {
 			return m, nil
 		}
 	case "up", "ctrl+p", "shift+tab":
-		if len(m.sugg) > 0 {
-			m.suggIdx = (m.suggIdx - 1 + len(m.sugg)) % len(m.sugg)
+		if m.moveSugg(-1) {
+			return m, nil
+		}
+	case "right", "left": // in the filter, these keep moving the cursor
+		if (m.mode == modeAdd || m.mode == modeEdit) && m.moveSugg(map[string]int{"right": 1, "left": -1}[msg.String()]) {
 			return m, nil
 		}
 	}
@@ -705,6 +713,16 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refresh(nil)
 	}
 	return m, cmd
+}
+
+// moveSugg moves the highlight d places through the suggestions, wrapping
+// around; false if there are none.
+func (m *Model) moveSugg(d int) bool {
+	if len(m.sugg) == 0 {
+		return false
+	}
+	m.suggIdx = (m.suggIdx + d + len(m.sugg)) % len(m.sugg)
+	return true
 }
 
 func (m *Model) submitInput() {

@@ -364,8 +364,8 @@ func (m Model) footerSegs() [2][]Seg {
 	var l1, l2 []Seg
 	switch m.mode {
 	case modeAdd, modeEdit:
+		// The app draws its save / cancel buttons under this.
 		l1 = []Seg{{Text: map[mode]string{modeAdd: "add task", modeEdit: "edit task"}[m.mode], Style: "prompt"}}
-		l2 = []Seg{{Text: "enter save · esc cancel", Style: "dim"}}
 	case modeFilter, modeSaveName:
 		// The input and its hint are drawn in the footer by the app.
 	case modeConfirm:

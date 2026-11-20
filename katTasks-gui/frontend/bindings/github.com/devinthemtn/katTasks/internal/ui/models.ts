@@ -93,6 +93,11 @@ export interface AlarmPicker {
      * "date" or "time"
      */
     "field": string;
+
+    /**
+     * "alarm" or "due" (no time)
+     */
+    "kind": string;
 }
 
 /**

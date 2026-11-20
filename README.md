@@ -231,7 +231,14 @@ with a reminder of the `(A)`, `+project`, `@context`, `due:`, `rec:`,
 task, `tab` completes `+project`, `@context`, `due:`, `rec:` and `at:` words.
 `at:` offers the next half hours, and the times that fit what you've typed
 (`at:9` → `at:900`, `at:915`…; `at:3p` → `at:3pm`). Typing `alarm:` opens a
-[date and time picker](#alarms). Relative due dates are converted to
+[date and time picker](#alarms).
+
+Typing `due:` opens a month calendar on today. `←→` moves a day, `↑↓` a
+week and `[` `]` a month. `enter` writes the date, as in `due:2026-12-01`,
+and `esc` closes the calendar and leaves `due:` for you to finish. Any other
+key closes it and is typed into the line, so you can still type `due:fri` or
+`due:+3d` without stopping. `tab` on a `due:` word already in the line opens
+the calendar on that date. Relative due dates are converted to
 `YYYY-MM-DD` when you save: `due:today`, `due:tomorrow`, `due:fri`,
 `due:+3d`, `due:+2w`, `due:+1m`. When a project or context is selected in the
 sidebar, `a` fills it in for you.
@@ -429,6 +436,8 @@ Completing a task drops its priority, as todo.sh does, but keeps it as a
 
 ## Lua scripts
 
+See [SCRIPTING.md](SCRIPTING.md) for a full guide with examples.
+
 Put `.lua` files in a `scripts/` folder next to config.toml (on Linux
 `~/.config/katTasks/scripts/`). A `-- comment` on the first line becomes the
 script's description. Each script `NAME.lua` can be run two ways:
@@ -451,6 +460,8 @@ Scripts get a `kat` table:
 | `kat.date(s)` | `"fri"`, `"+3d"`, `"tomorrow"`… as `YYYY-MM-DD`, or `nil` |
 | `kat.add(line)` | add a task |
 | `kat.update(line)` | replace the task under the cursor (from `:` only) |
+| `kat.choose(prompt, {…})` | show a list to pick from; returns the pick, or `nil` on `esc` (`/NAME` only) |
+| `kat.replace(line)` | replace the whole line being typed (`/NAME` only) |
 | `kat.status(msg)` | show a message in the footer; `print` does the same |
 
 A task is a table with `line`, `text`, `done`, `priority`, `due`, `projects`,

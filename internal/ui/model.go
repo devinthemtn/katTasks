@@ -83,7 +83,8 @@ type Model struct {
 	input     textinput.Model
 	editing   *todo.Task
 	sugg      []string
-	pick      *alarmPick // the alarm: date and time picker, over the task popup
+	pick      *alarmPick    // the alarm: date and time picker, over the task popup
+	choice    *scriptChoice // a script's kat.choose list, over the task popup
 	suggIdx   int
 	confirm   string
 	onConfirm func(*Model)
@@ -435,7 +436,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.mode {
 		case modeAdd, modeEdit:
 			if m.pick != nil {
-				m.alarmPickerKey(msg.String())
+				if m.alarmPickerKey(msg.String()) {
+					return m, nil
+				}
+				// the due: picker closed on a key it doesn't use; type it
+			}
+			if m.choice != nil {
+				m.choiceKey(msg.String())
 				return m, nil
 			}
 			return m.updateInput(msg)
@@ -649,6 +656,9 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		if (m.mode == modeAdd || m.mode == modeEdit) && !m.expandScripts() {
+			if m.choice != nil {
+				m.choice.submit = true // save once it's answered
+			}
 			return m, nil // the script's error is in the footer; keep typing
 		}
 		m.submitInput()
@@ -660,6 +670,10 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		if _, w := m.wordAtCursor(); (m.mode == modeAdd || m.mode == modeEdit) && isAlarmWord(w) {
 			m.openAlarmPicker() // change an alarm: already typed
+			return m, nil
+		}
+		if _, w := m.wordAtCursor(); (m.mode == modeAdd || m.mode == modeEdit) && isDueWord(w) {
+			m.openDuePicker() // change a due: already typed
 			return m, nil
 		}
 	case "down", "ctrl+n":
@@ -675,9 +689,15 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
-	if _, w := m.wordAtCursor(); (m.mode == modeAdd || m.mode == modeEdit) && strings.EqualFold(w, "alarm:") && msg.String() == ":" {
-		m.openAlarmPicker()
-		return m, cmd
+	if _, w := m.wordAtCursor(); (m.mode == modeAdd || m.mode == modeEdit) && msg.String() == ":" {
+		switch {
+		case strings.EqualFold(w, "alarm:"):
+			m.openAlarmPicker()
+			return m, cmd
+		case strings.EqualFold(w, "due:"):
+			m.openDuePicker()
+			return m, cmd
+		}
 	}
 	m.updateSuggestions()
 	if m.mode == modeFilter {
@@ -733,7 +753,7 @@ func (m *Model) submitInput() {
 }
 
 var keywordWords = []string{
-	"due:today", "due:tomorrow", "due:mon", "due:tue", "due:wed", "due:thu", "due:fri", "due:sat", "due:sun", "due:+1w", "due:+1m",
+	"due:", "due:today", "due:tomorrow", "due:mon", "due:tue", "due:wed", "due:thu", "due:fri", "due:sat", "due:sun", "due:+1w", "due:+1m",
 	"alarm:",
 	"rec:1d", "rec:1b", "rec:1w", "rec:2w", "rec:1m", "rec:1y", "rec:+1w", "rec:+1m", "rec:+1y",
 }
@@ -854,10 +874,14 @@ func (m *Model) acceptSuggestion() {
 		m.updateSuggestions()
 		return
 	}
-	if s == "alarm:" { // completing to alarm: opens the picker
+	if s == "alarm:" || s == "due:" { // completing to these opens a picker
 		m.input.SetValue(string(val[:start]) + s + string(val[end:]))
 		m.input.SetCursor(start + len([]rune(s)))
-		m.openAlarmPicker()
+		if s == "due:" {
+			m.openDuePicker()
+		} else {
+			m.openAlarmPicker()
+		}
 		return
 	}
 	rest := val[end:]

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -23,6 +24,7 @@ type alarmPick struct {
 	start int       // the alarm: word, in runes of the input
 	end   int
 	fresh bool // the word was a bare "alarm:" typed just now
+	due   bool // a due: date picker: just the month grid, no time
 }
 
 const (
@@ -52,22 +54,65 @@ func (p *alarmPick) when() time.Time {
 	return p.day.Add(time.Duration(p.min) * time.Minute)
 }
 
+// openDuePicker opens the month grid on the due: word that ends at the
+// cursor, starting at its date (due:fri works too) or today.
+func (m *Model) openDuePicker() {
+	start, w := m.wordAtCursor()
+	p := &alarmPick{start: start, end: start + len([]rune(w)), due: true}
+	now := time.Now()
+	v := w[len("due:"):]
+	if d, err := time.ParseInLocation(todo.DateLayout, v, time.Local); err == nil {
+		p.day = d
+	} else if d, ok := todo.ResolveDate(v, now); ok {
+		p.day = d
+	} else {
+		p.day = todo.Midnight(now)
+	}
+	m.pick, m.sugg = p, nil
+}
+
+// isDueWord reports whether w is a due: word the picker can open on.
+func isDueWord(w string) bool { return strings.HasPrefix(strings.ToLower(w), "due:") }
+
 // isAlarmWord reports whether w is an alarm: word the picker can open on.
 func isAlarmWord(w string) bool { return strings.HasPrefix(strings.ToLower(w), "alarm:") }
 
-// alarmPickerKey handles a key while the picker is open.
-func (m *Model) alarmPickerKey(k string) {
+// alarmPickerKey handles a key while the picker is open. It reports false
+// for a key the due: picker doesn't use: the picker has closed, and the key
+// should be typed into the line, so "due:fri" can still be typed.
+func (m *Model) alarmPickerKey(k string) bool {
 	p := m.pick
 	switch k {
 	case "esc":
 		m.closeAlarmPicker(false)
-		return
+		return true
 	case "enter":
 		m.closeAlarmPicker(true)
-		return
-	case "tab", "shift+tab":
+		return true
+	}
+	if p.due {
+		switch k {
+		case "left":
+			p.day = p.day.AddDate(0, 0, -1)
+		case "right":
+			p.day = p.day.AddDate(0, 0, 1)
+		case "up":
+			p.day = p.day.AddDate(0, 0, -7)
+		case "down":
+			p.day = p.day.AddDate(0, 0, 7)
+		case "[", "pgup":
+			p.day = addMonths(p.day, -1)
+		case "]", "pgdown":
+			p.day = addMonths(p.day, 1)
+		default:
+			m.closeAlarmPicker(false)
+			return false
+		}
+		return true
+	}
+	if k == "tab" || k == "shift+tab" {
 		p.field, p.typed = 1-p.field, ""
-		return
+		return true
 	}
 	if p.field == pickDate {
 		switch k {
@@ -88,7 +133,7 @@ func (m *Model) alarmPickerKey(k string) {
 		case "T":
 			p.day = todo.Midnight(time.Now()).AddDate(0, 0, 1)
 		}
-		return
+		return true
 	}
 	step := func(n int) {
 		p.min = ((p.min+n)%(24*60) + 24*60) % (24 * 60)
@@ -117,6 +162,7 @@ func (m *Model) alarmPickerKey(k string) {
 			}
 		}
 	}
+	return true
 }
 
 // pickDay chooses a day of the grid (a click in katTasks-gui).
@@ -141,6 +187,11 @@ func (m *Model) closeAlarmPicker(set bool) {
 	start := min(p.start, end)
 	var ins []rune
 	switch {
+	case set && p.due:
+		ins = []rune("due:" + p.day.Format(todo.DateLayout))
+		if end >= len(val) || val[end] != ' ' {
+			ins = append(ins, ' ')
+		}
 	case set:
 		ins = []rune("alarm:" + todo.FormatAlarm(p.when()))
 		if end >= len(val) || val[end] != ' ' {
@@ -152,6 +203,7 @@ func (m *Model) closeAlarmPicker(set bool) {
 	case p.fresh:
 		// nothing: drop the bare alarm:
 	default:
+		m.updateSuggestions()
 		return // keep what was there
 	}
 	m.input.SetValue(string(val[:start]) + string(ins) + string(val[end:]))
@@ -202,40 +254,15 @@ func (m Model) viewAlarmPicker(w int) []string {
 	// the choice in the field that doesn't have focus.
 	on, sel := m.st.suggestOn.Padding(0), m.st.text.Background(m.st.selectedBg)
 
+	if p.due {
+		return m.viewDuePicker(w)
+	}
 	head := m.st.header.Render("⏰ ALARM") + "  " + m.st.text.Render(p.when().Format("Mon Jan 2, 2006")+"  "+p.clock()) +
 		faint("  "+untilText(p.when(), now))
 	lines := []string{head, ""}
 
 	// Month grid, left; time, right.
-	var grid []string
-	title := p.day.Format("January 2006")
-	grid = append(grid, m.st.title.Render(fmt.Sprintf("%-20s", " "+title)))
-	grid = append(grid, faint(" Su Mo Tu We Th Fr Sa"))
-	days := pickGrid(p.day)
-	for wk := 0; wk < 6; wk++ {
-		var row strings.Builder
-		row.WriteString(" ")
-		for i := wk * 7; i < wk*7+7; i++ {
-			d := days[i]
-			cell := fmt.Sprintf("%2d", d.Day())
-			st := m.st.text
-			switch {
-			case sameDay(d, p.day) && p.field == pickDate:
-				st = on
-			case sameDay(d, p.day):
-				st = sel
-			case sameDay(d, now):
-				st = m.st.today
-			case d.Month() != p.day.Month() || d.Before(todo.Midnight(now)):
-				st = m.st.faint
-			}
-			row.WriteString(st.Render(cell))
-			if i < wk*7+6 {
-				row.WriteString(" ")
-			}
-		}
-		grid = append(grid, row.String())
-	}
+	grid := m.viewPickGrid()
 
 	timeBox := " " + p.clock() + " "
 	if p.field == pickTime {
@@ -268,6 +295,77 @@ func (m Model) viewAlarmPicker(w int) []string {
 	return lines
 }
 
+// viewPickGrid draws the month grid around the picker's day.
+func (m Model) viewPickGrid() []string {
+	p := m.pick
+	now := time.Now()
+	on, sel := m.st.suggestOn.Padding(0), m.st.text.Background(m.st.selectedBg)
+	grid := []string{
+		m.st.title.Render(fmt.Sprintf("%-20s", " "+p.day.Format("January 2006"))),
+		m.st.faint.Render(" Su Mo Tu We Th Fr Sa"),
+	}
+	days := pickGrid(p.day)
+	for wk := 0; wk < 6; wk++ {
+		var row strings.Builder
+		row.WriteString(" ")
+		for i := wk * 7; i < wk*7+7; i++ {
+			d := days[i]
+			cell := fmt.Sprintf("%2d", d.Day())
+			st := m.st.text
+			switch {
+			case sameDay(d, p.day) && p.field == pickDate:
+				st = on
+			case sameDay(d, p.day):
+				st = sel
+			case sameDay(d, now):
+				st = m.st.today
+			case d.Month() != p.day.Month() || d.Before(todo.Midnight(now)):
+				st = m.st.faint
+			}
+			row.WriteString(st.Render(cell))
+			if i < wk*7+6 {
+				row.WriteString(" ")
+			}
+		}
+		grid = append(grid, row.String())
+	}
+	return grid
+}
+
+// viewDuePicker draws the due: picker: the month grid only.
+func (m Model) viewDuePicker(w int) []string {
+	p := m.pick
+	key := func(k string) string { return m.st.helpKey.Render(k) }
+	faint := m.st.faint.Render
+	head := m.st.header.Render("📅 DUE") + "  " + m.st.text.Render(p.day.Format("Mon Jan 2, 2006")) +
+		faint("  "+daysText(p.day, time.Now()))
+	lines := append([]string{head, ""}, m.viewPickGrid()...)
+	lines = append(lines, "",
+		key("←→↑↓")+faint(" day  ")+key("[ ]")+faint(" month  ")+key("enter")+faint(" set  ")+key("esc")+faint(" cancel"),
+		faint("or keep typing: ")+key("fri")+faint(" ")+key("+3d")+faint(" ")+key("2026-12-01"))
+	for i, l := range lines {
+		lines[i] = ansi.Truncate(l, w, "…")
+	}
+	return lines
+}
+
+// daysText says how far off day d is: "today", "tomorrow", "in 3 days",
+// "yesterday", "2 days ago".
+func daysText(d, now time.Time) string {
+	n := int(math.Round(todo.Midnight(d).Sub(todo.Midnight(now)).Hours() / 24)) // DST days are 23 or 25h
+	switch {
+	case n == 0:
+		return "today"
+	case n == 1:
+		return "tomorrow"
+	case n == -1:
+		return "yesterday"
+	case n < 0:
+		return fmt.Sprintf("%d days ago", -n)
+	}
+	return fmt.Sprintf("in %d days", n)
+}
+
 // AlarmPicker is the picker as data, for katTasks-gui.
 type AlarmPicker struct {
 	When     string    `json:"when"`  // "Tue Dec 1, 2026  7:30"
@@ -278,6 +376,7 @@ type AlarmPicker struct {
 	Time     string    `json:"time"` // "7:30"
 	Typed    string    `json:"typed"`
 	Field    string    `json:"field"` // "date" or "time"
+	Kind     string    `json:"kind"`  // "alarm" or "due" (no time)
 }
 
 // PickDay is one day of the picker's grid.
@@ -298,7 +397,10 @@ func (m Model) alarmPickerState() *AlarmPicker {
 	ap := &AlarmPicker{
 		When: p.when().Format("Mon Jan 2, 2006") + "  " + p.clock(), Until: untilText(p.when(), now),
 		Month: p.day.Format("January 2006"), Weekdays: []string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"},
-		Time: p.clock(), Typed: p.typed, Field: "date",
+		Time: p.clock(), Typed: p.typed, Field: "date", Kind: "alarm",
+	}
+	if p.due {
+		ap.Kind, ap.When, ap.Until, ap.Time = "due", p.day.Format("Mon Jan 2, 2006"), daysText(p.day, now), ""
 	}
 	if p.field == pickTime {
 		ap.Field = "time"

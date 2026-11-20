@@ -86,3 +86,45 @@ func TestPaletteScript(t *testing.T) {
 		t.Fatalf("undo should revert the whole script: %v", m.tasks)
 	}
 }
+
+func TestChooseScript(t *testing.T) {
+	src := `local p = kat.choose("Priority", {"A", "B", "C"})
+if not p then return nil end
+local rest = kat.input:gsub("^%([A-Z]%)%s*", "")
+kat.replace("(" .. p .. ") " .. rest)`
+	m := scriptModel(t, map[string]string{"pri": src})
+
+	// tab on the suggestion opens the list; a letter picks.
+	m.startAdd()
+	m = typeText(m, "Call mom /pri")
+	m = press(m, tea.KeyTab)
+	if m.choice == nil || len(m.choice.options) != 3 {
+		t.Fatalf("no choice list: %v (%s)", m.choice, m.status)
+	}
+	m = typeText(m, "b")
+	if m.choice != nil || m.input.Value() != "(B) Call mom " {
+		t.Fatalf("after pick %q", m.input.Value())
+	}
+
+	// enter with /pri still in the text asks, then saves; an old priority goes.
+	m = typeText(m, "/pri")
+	m = press(m, tea.KeyEnter)
+	if m.choice == nil || m.mode != modeAdd {
+		t.Fatalf("enter should ask first (mode %v)", m.mode)
+	}
+	m = press(m, tea.KeyDown)
+	m = press(m, tea.KeyDown)
+	m = press(m, tea.KeyEnter)
+	if got := m.tasks[len(m.tasks)-1].String(); m.mode != modeNormal || got != "(C) Call mom" {
+		t.Fatalf("saved %q (mode %v)", got, m.mode)
+	}
+
+	// esc drops the word and leaves the rest.
+	m.startAdd()
+	m = typeText(m, "Walk /pri")
+	m = press(m, tea.KeyTab)
+	m = press(m, tea.KeyEsc)
+	if m.choice != nil || m.mode != modeAdd || m.input.Value() != "Walk" {
+		t.Fatalf("after esc %q mode %v", m.input.Value(), m.mode)
+	}
+}

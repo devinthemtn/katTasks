@@ -187,7 +187,7 @@
   const popupHelp: Seg[][] = [
     [{ text: '(A) ', style: 'key' }, { text: 'priority, at the start', style: 'dim' }],
     [{ text: '+project ', style: 'project' }, { text: '@context ', style: 'context' }, { text: 'key:value', style: 'tag' }],
-    [{ text: 'due:', style: 'tag' }, { text: 'today tomorrow fri +3d +2w +1m 2026-12-01', style: 'dim' }],
+    [{ text: 'due:', style: 'tag' }, { text: 'opens a calendar, or type today fri +3d 2026-12-01', style: 'dim' }],
     [{ text: 'rec:', style: 'tag' }, { text: '1w 3d 5b 1m 1y · rec:+1w counts from due', style: 'dim' }],
     [{ text: 'alarm:', style: 'tag' }, { text: 'opens a date and time picker; rings like an alarm clock', style: 'dim' }],
     [{ text: 'at:', style: 'tag' }, { text: '930 1400 3pm · on its due: day, or daily; agenda + alerts', style: 'dim' }],
@@ -355,7 +355,7 @@
           <div class="rule"></div>
           {#if s.input.alarm}
             {@const a = s.input.alarm}
-            <div class="line"><span class="prompt bold">⏰ ALARM</span>&nbsp;&nbsp;<span>{a.when}</span>&nbsp;&nbsp;<span class="dim">{a.until}</span></div>
+            <div class="line"><span class="prompt bold">{a.kind === 'due' ? '📅 DUE' : '⏰ ALARM'}</span>&nbsp;&nbsp;<span>{a.when}</span>&nbsp;&nbsp;<span class="dim">{a.until}</span></div>
             <div class="line">&nbsp;</div>
             <div class="alarm-pick">
               <div class="alarm-cal">
@@ -372,6 +372,7 @@
                   {/each}
                 </div>
               </div>
+              {#if a.kind !== 'due'}
               <div class="alarm-time">
                 <div class="dim">Time</div>
                 <button class="dim" onclick={() => { if (a.field !== 'time') key('tab'); key('up'); }} aria-label="later">▲</button>
@@ -379,10 +380,14 @@
                 <button class="dim" onclick={() => { if (a.field !== 'time') key('tab'); key('down'); }} aria-label="earlier">▼</button>
                 {#if a.typed}<div class="dim">typed {a.typed}</div>{/if}
               </div>
+              {/if}
             </div>
             <div class="line">&nbsp;</div>
             <div class="line">
-              {#if a.field === 'date'}
+              {#if a.kind === 'due'}
+                <Text segs={[{ text: '←→↑↓', style: 'key' }, { text: ' day · ', style: 'dim' }, { text: '[ ]', style: 'key' }, { text: ' month · or keep typing ', style: 'dim' },
+                  { text: 'fri', style: 'key' }, { text: ' ', style: 'dim' }, { text: '+3d', style: 'key' }]} />
+              {:else if a.field === 'date'}
                 <Text segs={[{ text: '←→↑↓', style: 'key' }, { text: ' day · ', style: 'dim' }, { text: '[ ]', style: 'key' }, { text: ' month · ', style: 'dim' },
                   { text: 't', style: 'key' }, { text: ' today · ', style: 'dim' }, { text: 'T', style: 'key' }, { text: ' tomorrow', style: 'dim' }]} />
               {:else}
@@ -391,7 +396,7 @@
               {/if}
             </div>
             <div class="line buttons">
-              <button class="chip" onclick={() => key('enter')}>set alarm</button>
+              <button class="chip" onclick={() => key('enter')}>{a.kind === 'due' ? 'set due date' : 'set alarm'}</button>
               <button class="sugg-on" onclick={() => key('esc')}>cancel</button>
               <span class="dim">&nbsp;tab date / time</span>
             </div>

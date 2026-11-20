@@ -48,12 +48,17 @@ func (m Model) viewTaskPopup(maxW int) string {
 		lines = append(lines, m.viewAlarmPicker(w)...)
 		return m.st.paneFocused.Padding(0, 1).Width(w + 2).Render(strings.Join(lines, "\n"))
 	}
+	if m.choice != nil {
+		lines = append(lines, m.st.faint.Render(strings.Repeat("─", w)))
+		lines = append(lines, m.viewChoice(w)...)
+		return m.st.paneFocused.Padding(0, 1).Width(w + 2).Render(strings.Join(lines, "\n"))
+	}
 
 	key := func(k string) string { return m.st.helpKey.Render(k) }
 	help := []string{
 		key("(A) ") + m.st.faint.Render("priority, at the start"),
 		m.st.project.Render("+project ") + m.st.context.Render("@context ") + m.st.tag.Render("key:value"),
-		m.st.tag.Render("due:") + m.st.faint.Render("today tomorrow fri +3d +2w +1m 2026-12-01"),
+		m.st.tag.Render("due:") + m.st.faint.Render("opens a calendar, or type today fri +3d 2026-12-01"),
 		m.st.tag.Render("rec:") + m.st.faint.Render("1w 3d 5b 1m 1y · rec:+1w counts from due"),
 		m.st.tag.Render("alarm:") + m.st.faint.Render("opens a date and time picker; rings like an alarm clock"),
 		m.st.tag.Render("at:") + m.st.faint.Render("930 1400 3pm · on its due: day, or daily; agenda + alerts"),

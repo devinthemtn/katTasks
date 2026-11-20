@@ -11,6 +11,9 @@
 //	kat.add(line)    add a task
 //	kat.update(line) replace the task under the cursor (from : only)
 //	kat.status(msg)  show a message in the footer (print does the same)
+//	kat.choose(prompt, {opts})  ask the user to pick one (inline only);
+//	                 returns the chosen string, or nil if cancelled
+//	kat.replace(line) replace the whole task being typed (inline only)
 //
 // A task is a table with line, text, done, priority, due, projects,
 // contexts and tags. Inline, the script's return value replaces the /name
@@ -90,6 +93,17 @@ type Env struct {
 	Current *todo.Task // task under the cursor or being edited; may be nil
 	Tasks   []*todo.Task
 	Now     time.Time
+	// Answers are the kat.choose picks made so far, in call order. A
+	// script that calls kat.choose once more than there are answers stops,
+	// and Result.Choice says what to ask; the UI runs it again with the
+	// pick appended ("" for cancel, which kat.choose returns as nil).
+	Answers []string
+}
+
+// Choice is a question a script asked with kat.choose.
+type Choice struct {
+	Prompt  string
+	Options []string
 }
 
 // Result is what a script asked for.
@@ -98,6 +112,8 @@ type Result struct {
 	HasOutput bool
 	Adds      []string // kat.add lines, in order
 	Update    *string  // kat.update line
+	Replace   *string  // kat.replace line
+	Choice    *Choice  // set when the script is waiting on kat.choose
 	Status    string   // kat.status / print, joined
 }
 
@@ -170,13 +186,55 @@ func Run(s Script, env Env) (Result, error) {
 		return 0
 	}))
 	L.SetField(kat, "status", L.NewFunction(addStatus))
+	asked := 0
+	var choice *Choice
+	L.SetField(kat, "choose", L.NewFunction(func(L *lua.LState) int {
+		if !env.Inline {
+			L.RaiseError("kat.choose only works in a /name script")
+		}
+		prompt := L.CheckString(1)
+		opts := L.CheckTable(2)
+		var list []string
+		opts.ForEach(func(_, v lua.LValue) { list = append(list, L.ToStringMeta(v).String()) })
+		if len(list) == 0 {
+			L.RaiseError("kat.choose: no options")
+		}
+		if asked < len(env.Answers) {
+			a := env.Answers[asked]
+			asked++
+			if a == "" {
+				L.Push(lua.LNil)
+			} else {
+				L.Push(lua.LString(a))
+			}
+			return 1
+		}
+		choice = &Choice{Prompt: prompt, Options: list}
+		L.RaiseError("%s", errChoose)
+		return 0
+	}))
+	L.SetField(kat, "replace", L.NewFunction(func(L *lua.LState) int {
+		if !env.Inline {
+			L.RaiseError("kat.replace only works in a /name script")
+		}
+		line := strings.TrimSpace(L.CheckString(1))
+		res.Replace = &line
+		return 0
+	}))
 	L.SetGlobal("kat", kat)
 
 	if err := L.DoFile(s.Path); err != nil {
+		if choice != nil {
+			// Waiting on the user; nothing else the script did counts yet.
+			return Result{Choice: choice}, nil
+		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return Result{}, fmt.Errorf("%s: stopped after %s", s.Name, Timeout)
 		}
 		return Result{}, fmt.Errorf("%s: %s", s.Name, firstLine(err.Error()))
+	}
+	if choice != nil { // a pcall swallowed the stop
+		return Result{Choice: choice}, nil
 	}
 	if L.GetTop() > 0 {
 		switch v := L.Get(1); v.Type() {
@@ -192,6 +250,9 @@ func Run(s Script, env Env) (Result, error) {
 	res.Status = strings.Join(status, " · ")
 	return res, nil
 }
+
+// errChoose stops a script at a kat.choose that has no answer yet.
+const errChoose = "kat.choose: waiting for a choice"
 
 func firstLine(s string) string {
 	s, _, _ = strings.Cut(s, "\n")

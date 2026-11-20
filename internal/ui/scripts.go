@@ -83,19 +83,41 @@ func (m *Model) scriptEnv(inline bool, input string) script.Env {
 
 // runInlineScript replaces the word at [start, end) of the input, which
 // names s, with what s returns. It reports whether the script ran.
+// If the script asks with kat.choose, it opens the choice list and reports
+// false; picking runs the script again with the answer.
 func (m *Model) runInlineScript(s script.Script, start, end int) bool {
+	return m.runInlineScriptWith(s, start, end, nil)
+}
+
+func (m *Model) runInlineScriptWith(s script.Script, start, end int, answers []string) bool {
 	val := []rune(m.input.Value())
 	before, after := string(val[:start]), string(val[end:])
 	rest := strings.Join(strings.Fields(before+" "+after), " ")
-	res, err := script.Run(s, m.scriptEnv(true, rest))
+	env := m.scriptEnv(true, rest)
+	env.Answers = answers
+	res, err := script.Run(s, env)
 	if err != nil {
 		m.setError("%v", err)
+		return false
+	}
+	if res.Choice != nil {
+		m.openChoice(s, start, end, answers, res.Choice)
 		return false
 	}
 	out := strings.TrimSpace(strings.ReplaceAll(res.Output, "\n", " "))
 	var nv string
 	var cur int
-	if out == "" {
+	if res.Replace != nil {
+		// The script rewrote the whole line; its return value goes on the end.
+		nv = *res.Replace
+		if out != "" {
+			nv = strings.TrimSpace(nv + " " + out)
+		}
+		if nv != "" {
+			nv += " "
+		}
+		cur = len([]rune(nv))
+	} else if out == "" {
 		// Drop the word and one of the spaces around it.
 		b := strings.TrimRight(before, " ")
 		a := strings.TrimLeft(after, " ")

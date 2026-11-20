@@ -133,3 +133,39 @@ func TestHeadlessCalendarClicks(t *testing.T) {
 		t.Fatal("day click didn't move the selection")
 	}
 }
+
+func TestDuePicker(t *testing.T) {
+	m := scriptModel(t, nil)
+	today := todo.Midnight(time.Now())
+
+	// typing due: opens the month grid on today; arrows move, enter sets.
+	m.startAdd()
+	m = typeText(m, "Dentist due:")
+	if m.pick == nil || !m.pick.due || !sameDay(m.pick.day, today) {
+		t.Fatalf("picker %+v", m.pick)
+	}
+	m = press(m, tea.KeyRight)
+	m = press(m, tea.KeyDown)
+	m = press(m, tea.KeyEnter)
+	want := "Dentist due:" + today.AddDate(0, 0, 8).Format(todo.DateLayout) + " "
+	if m.pick != nil || m.input.Value() != want {
+		t.Fatalf("after enter %q, want %q", m.input.Value(), want)
+	}
+
+	// any other key closes it and is typed, so due:fri still works.
+	m.startAdd()
+	m = typeText(m, "Gym due:fri")
+	if m.pick != nil || m.input.Value() != "Gym due:fri" {
+		t.Fatalf("typed through: %q (picker %v)", m.input.Value(), m.pick != nil)
+	}
+	// tab on it opens the grid on that Friday; esc keeps the text.
+	m = press(m, tea.KeyTab)
+	fri, _ := todo.ResolveDate("fri", time.Now())
+	if m.pick == nil || !sameDay(m.pick.day, fri) {
+		t.Fatalf("tab picker %+v", m.pick)
+	}
+	m = press(m, tea.KeyEsc)
+	if m.pick != nil || m.mode != modeAdd || m.input.Value() != "Gym due:fri" {
+		t.Fatalf("after esc %q", m.input.Value())
+	}
+}

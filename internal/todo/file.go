@@ -54,8 +54,13 @@ func ModTime(path string) time.Time {
 }
 
 // Save writes tasks to path atomically (temp file + rename) and returns the
-// new modification time.
+// new modification time. The temp file is synced before the rename, so a
+// crash or power cut leaves either the old file or the new one. If path is
+// a symlink, the file it points to is replaced and the link is kept.
 func Save(path string, tasks []*Task) (time.Time, error) {
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return time.Time{}, err
 	}
@@ -82,6 +87,10 @@ func Save(path string, tasks []*Task) (time.Time, error) {
 		tmp.Close()
 		return time.Time{}, err
 	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return time.Time{}, err
+	}
 	if err := tmp.Close(); err != nil {
 		return time.Time{}, err
 	}
@@ -91,7 +100,46 @@ func Save(path string, tasks []*Task) (time.Time, error) {
 	if err := os.Rename(tmp.Name(), path); err != nil {
 		return time.Time{}, err
 	}
+	syncDir(filepath.Dir(path))
 	return ModTime(path), nil
+}
+
+// syncDir makes a rename in dir durable. It's best effort: Windows can't
+// sync a folder, and the rename is done either way.
+func syncDir(dir string) {
+	if d, err := os.Open(dir); err == nil {
+		d.Sync() //nolint:errcheck
+		d.Close()
+	}
+}
+
+// Archive moves done to donePath and saves keep, the tasks left, to
+// todoPath. done.txt is written first, so a failure can't lose tasks. If
+// writing either file fails, done.txt is put back as it was, so trying
+// again doesn't add the tasks twice; todo.txt is then unchanged too, as
+// Save replaces it whole or not at all.
+func Archive(todoPath string, keep []*Task, donePath string, done []*Task) (time.Time, error) {
+	size := int64(-1) // done.txt doesn't exist
+	if st, err := os.Stat(donePath); err == nil {
+		size = st.Size()
+	}
+	restore := func() {
+		if size < 0 {
+			os.Remove(donePath)
+		} else {
+			os.Truncate(donePath, size)
+		}
+	}
+	if err := Append(donePath, done); err != nil {
+		restore()
+		return time.Time{}, err
+	}
+	mt, err := Save(todoPath, keep)
+	if err != nil {
+		restore()
+		return time.Time{}, err
+	}
+	return mt, nil
 }
 
 // lineEnding is how the file at path is written, so saving it doesn't

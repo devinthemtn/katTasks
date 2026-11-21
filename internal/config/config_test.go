@@ -172,12 +172,13 @@ func TestReadmeListsSettings(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	readme := strings.ReplaceAll(string(b), "\r\n", "\n") // git may check it out with CRLF
+	// Git may check both files out with CRLF line endings on Windows.
+	readme := strings.ReplaceAll(string(b), "\r\n", "\n")
 	start := strings.Index(readme, "## Settings")
 	end := strings.Index(readme[start:], "## Keys")
 	block := readme[start : start+end]
 	table := ""
-	for _, line := range strings.Split(DefaultSettingsFile, "\n") {
+	for _, line := range strings.Split(strings.ReplaceAll(DefaultSettingsFile, "\r\n", "\n"), "\n") {
 		switch {
 		case strings.HasPrefix(line, "["):
 			table = strings.Trim(line, "[]")

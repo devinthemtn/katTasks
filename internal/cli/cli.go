@@ -530,14 +530,10 @@ func cmdArchive(c *ctx, args []string) error {
 		}
 	}
 	if len(done) > 0 {
-		// done.txt first, so a failure can't lose tasks.
-		if err := todo.Append(c.Cfg.Files.Done, done); err != nil {
+		if _, err := todo.Archive(c.Cfg.Files.Todo, keep, c.Cfg.Files.Done, done); err != nil {
 			return err
 		}
 		c.tasks = keep
-		if err := c.save(); err != nil {
-			return err
-		}
 	}
 	return c.changed(fmt.Sprintf("%d task(s) archived to %s.", len(done), c.Cfg.Files.Done), report, nil)
 }

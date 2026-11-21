@@ -136,11 +136,14 @@ func (m *Model) toggleTargets() {
 			m.setError("todo.txt changed on disk — press r to reload first")
 			return
 		}
+		before := cloneAll(m.tasks)
 		complete()
-		m.archive(open)
-		if !m.statusErr {
-			m.setStatus("%s (archived)", strings.TrimSuffix(msg, " — u to undo"))
+		if !m.archive(open) {
+			m.tasks = before // nothing was saved: don't show them done
+			m.refresh(nil)
+			return
 		}
+		m.setStatus("%s (archived)", strings.TrimSuffix(msg, " — u to undo"))
 		return
 	}
 	if m.mutate(complete) {

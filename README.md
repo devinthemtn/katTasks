@@ -582,9 +582,9 @@ Blank lines are dropped.
 
 ## Safety
 
-- Every save writes a temporary file and renames it over todo.txt, so a crash can't leave the file half-written.
+- Every save writes a temporary file, syncs it to disk and renames it over todo.txt, so a crash or power cut can't leave the file half-written. Its permissions are kept, and if todo.txt is a symlink, the file it points to is saved and the link stays.
 - If another program changes todo.txt while katTasks is open, edits are refused until you press `r` to reload. katTasks never overwrites those changes.
-- Archiving writes done.txt before removing anything from todo.txt.
+- Archiving writes done.txt before removing anything from todo.txt. If todo.txt can't be saved, done.txt is put back as it was, so the tasks are never in both files.
 
 ## Releasing
 

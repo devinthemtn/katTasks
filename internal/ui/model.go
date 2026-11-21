@@ -377,31 +377,37 @@ func (m *Model) removeTasks(rm map[*todo.Task]bool) {
 	m.tasks = out
 }
 
-// archive moves the given tasks to done.txt. Archiving touches two files,
-// so it clears the undo history.
-func (m *Model) archive(ts []*todo.Task) {
+// archive moves the given tasks to done.txt and reports whether it did.
+// Archiving touches two files, so it clears the undo history. If it fails,
+// both files and the list are left as they were.
+func (m *Model) archive(ts []*todo.Task) bool {
 	if len(ts) == 0 {
 		m.setStatus("nothing to archive")
-		return
+		return false
 	}
 	if m.stale() {
 		m.setError("todo.txt changed on disk — press r to reload first")
-		return
-	}
-	if err := todo.Append(m.cfg.Files.Done, ts); err != nil {
-		m.setError("archive failed: %v", err)
-		return
+		return false
 	}
 	rm := map[*todo.Task]bool{}
 	for _, t := range ts {
 		rm[t] = true
 	}
-	m.removeTasks(rm)
-	if m.save() {
-		m.undo = nil
-		m.setStatus("archived %d task(s) to %s", len(ts), m.cfg.Files.Done)
+	var keep []*todo.Task
+	for _, t := range m.tasks {
+		if !rm[t] {
+			keep = append(keep, t)
+		}
 	}
+	mt, err := todo.Archive(m.cfg.Files.Todo, keep, m.cfg.Files.Done, ts)
+	if err != nil {
+		m.setError("archive failed: %v", err)
+		return false
+	}
+	m.tasks, m.modTime, m.undo = keep, mt, nil
+	m.setStatus("archived %d task(s) to %s", len(ts), m.cfg.Files.Done)
 	m.refresh(nil)
+	return true
 }
 
 // ---- update ----------------------------------------------------------------

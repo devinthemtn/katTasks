@@ -2,6 +2,8 @@ module github.com/devinthemtn/katTasks/katTasks-gui
 
 go 1.26.8
 
+toolchain go1.26.11
+
 require (
 	github.com/devinthemtn/katTasks v0.0.0
 	github.com/wailsapp/wails/v3 v3.0.0

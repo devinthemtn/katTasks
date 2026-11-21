@@ -68,6 +68,25 @@ jobs:
       - name: go test
         run: go test -race ./...
 
+  # go.mod's go line is the oldest Go that go install supports; the
+  # toolchain line, which the other jobs and releases use, is newer.
+  minimum-go:
+    name: katTasks (oldest supported Go)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read the go line
+        id: min
+        run: echo "version=$(sed -n 's/^go //p' go.mod)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ steps.min.outputs.version }}
+
+      - name: go test
+        run: go version && go test ./...
+
   # The desktop app's Go module and its Svelte frontend (Linux only: the
   # other platforms are built, not tested, by release.yml).
   gui:

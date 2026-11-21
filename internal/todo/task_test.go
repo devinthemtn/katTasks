@@ -81,3 +81,13 @@ func TestSaveLoad(t *testing.T) {
 		t.Fatalf("load: %v %v", out, err)
 	}
 }
+
+// A header with no text keeps the space after it, so it reads back the same.
+func TestEmptyTextRoundTrip(t *testing.T) {
+	for _, l := range []string{"x ", "(Z) ", "x 2026-01-05 ", "2026-01-05 "} {
+		tk := Parse(l)
+		if back := Parse(tk.String()); back.Done != tk.Done || back.Priority != tk.Priority || back.Text != "" {
+			t.Errorf("%q: String %q reads back as %+v", l, tk.String(), back)
+		}
+	}
+}

@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/devinthemtn/katTasks/internal/atomicfile"
 )
 
 // Load reads every non-blank line of path. A missing file is an empty list.
@@ -29,7 +31,7 @@ func Load(path string) ([]*Task, time.Time, error) {
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 64*1024), 1024*1024)
 	for sc.Scan() {
-		if strings.TrimSpace(sc.Text()) == "" {
+		if strings.TrimSpace(strings.TrimPrefix(sc.Text(), bom)) == "" {
 			continue
 		}
 		tasks = append(tasks, Parse(sc.Text()))
@@ -53,64 +55,23 @@ func ModTime(path string) time.Time {
 	return st.ModTime()
 }
 
-// Save writes tasks to path atomically (temp file + rename) and returns the
-// new modification time. The temp file is synced before the rename, so a
-// crash or power cut leaves either the old file or the new one. If path is
-// a symlink, the file it points to is replaced and the link is kept.
+// Save replaces path with tasks, whole or not at all (see atomicfile),
+// and returns the new modification time. If path is a symlink, the file it
+// points to is saved and the link kept.
 func Save(path string, tasks []*Task) (time.Time, error) {
-	if real, err := filepath.EvalSymlinks(path); err == nil {
-		path = real
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return time.Time{}, err
-	}
-	mode := fs.FileMode(0o644)
-	if st, err := os.Stat(path); err == nil {
-		mode = st.Mode().Perm()
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".todo-*.tmp")
-	if err != nil {
-		return time.Time{}, err
-	}
-	defer os.Remove(tmp.Name())
-
-	w := bufio.NewWriter(tmp)
+	var b bytes.Buffer
 	eol, withBOM := lineEnding(path)
 	if withBOM {
-		w.WriteString(bom)
+		b.WriteString(bom)
 	}
 	for _, t := range tasks {
-		w.WriteString(t.line())
-		w.WriteString(eol)
+		b.WriteString(t.line())
+		b.WriteString(eol)
 	}
-	if err := w.Flush(); err != nil {
-		tmp.Close()
+	if err := atomicfile.Write(path, b.Bytes(), 0o644); err != nil {
 		return time.Time{}, err
 	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return time.Time{}, err
-	}
-	if err := tmp.Close(); err != nil {
-		return time.Time{}, err
-	}
-	if err := os.Chmod(tmp.Name(), mode); err != nil {
-		return time.Time{}, err
-	}
-	if err := os.Rename(tmp.Name(), path); err != nil {
-		return time.Time{}, err
-	}
-	syncDir(filepath.Dir(path))
 	return ModTime(path), nil
-}
-
-// syncDir makes a rename in dir durable. It's best effort: Windows can't
-// sync a folder, and the rename is done either way.
-func syncDir(dir string) {
-	if d, err := os.Open(dir); err == nil {
-		d.Sync() //nolint:errcheck
-		d.Close()
-	}
 }
 
 // Archive moves done to donePath and saves keep, the tasks left, to

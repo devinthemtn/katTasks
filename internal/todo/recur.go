@@ -55,11 +55,29 @@ func (r Recurrence) Add(d time.Time) time.Time {
 	case 'y':
 		return addMonths(d, 12*r.N)
 	case 'b':
-		for n := r.N; n > 0; {
-			d = d.AddDate(0, 0, 1)
-			if wd := d.Weekday(); wd != time.Saturday && wd != time.Sunday {
-				n--
-			}
+		return AddBusinessDays(d, r.N)
+	}
+	return d
+}
+
+// AddBusinessDays returns the nth weekday (Mon–Fri) after d, or before it
+// if n is negative. Any 7 days in a row hold exactly 5 weekdays, so whole
+// weeks are skipped at once and only the last 1–5 weekdays are counted,
+// however large n is.
+func AddBusinessDays(d time.Time, n int) time.Time {
+	step := 1
+	if n < 0 {
+		step, n = -1, -n
+	}
+	if n == 0 {
+		return d
+	}
+	weeks := (n - 1) / 5
+	d = d.AddDate(0, 0, step*7*weeks)
+	for n -= 5 * weeks; n > 0; {
+		d = d.AddDate(0, 0, step)
+		if wd := d.Weekday(); wd != time.Saturday && wd != time.Sunday {
+			n--
 		}
 	}
 	return d

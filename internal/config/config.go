@@ -17,6 +17,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
+	"github.com/devinthemtn/katTasks/internal/atomicfile"
 	"github.com/devinthemtn/katTasks/internal/todo"
 )
 
@@ -357,28 +358,8 @@ func writeNew(path, data string) (created bool, err error) {
 	return true, f.Close()
 }
 
-// replaceFile writes data to path through a temporary file, so a failed
-// write leaves the old file intact. The file keeps its permissions.
+// replaceFile replaces the settings file at path with data, whole or not
+// at all; see atomicfile.
 func replaceFile(path, data string) error {
-	mode := fs.FileMode(0o644)
-	if fi, err := os.Stat(path); err == nil {
-		mode = fi.Mode().Perm()
-	}
-	f, err := os.CreateTemp(filepath.Dir(path), SettingsFile+".*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(f.Name())
-	if _, err := f.WriteString(data); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Chmod(mode); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	return os.Rename(f.Name(), path)
+	return atomicfile.Write(path, []byte(data), 0o644)
 }

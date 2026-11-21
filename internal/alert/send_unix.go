@@ -32,7 +32,8 @@ func send(title, body string, s Settings) error {
 	return errors.Join(errs...)
 }
 
-func isWSL() bool {
+// isWSL reports whether this is Linux under WSL; a variable for tests.
+var isWSL = func() bool {
 	b, _ := os.ReadFile("/proc/sys/kernel/osrelease")
 	return strings.Contains(strings.ToLower(string(b)), "microsoft")
 }

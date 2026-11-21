@@ -193,3 +193,84 @@ func TestReadmeListsSettings(t *testing.T) {
 		}
 	}
 }
+
+// Saving one setting keeps the rest of the file, comments and all.
+func TestSaveKeepsTheRest(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.toml")
+	const mine = "# my settings\ntheme = \"nord\" # dark\n\n[view]\nsort = \"due\"\n"
+	os.WriteFile(p, []byte(mine), 0o600)
+	if err := Save(p, "filters", "work", String("+Work due:+1w")); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(p)
+	if !strings.HasPrefix(string(b), mine) {
+		t.Errorf("the rest of the file changed:\n%s", b)
+	}
+	c, _, errs := Load(p)
+	if len(errs) != 0 || c.Theme != "nord" || c.View.Sort != "due" || c.Filters["work"] != "+Work due:+1w" {
+		t.Errorf("reloaded: theme %q sort %q filters %v errs %v", c.Theme, c.View.Sort, c.Filters, errs)
+	}
+}
+
+// A settings file kept in a dotfiles repo and linked into place stays
+// linked when katTasks saves a search or a theme.
+func TestSaveKeepsSymlinkedSettings(t *testing.T) {
+	dir := t.TempDir()
+	real := filepath.Join(dir, "dotfiles", "config.toml")
+	os.MkdirAll(filepath.Dir(real), 0o755)
+	os.WriteFile(real, []byte("theme = \"nord\"\n"), 0o644)
+	link := filepath.Join(dir, "katTasks", "config.toml")
+	os.MkdirAll(filepath.Dir(link), 0o755)
+	if err := os.Symlink(real, link); err != nil {
+		t.Skip("can't make symlinks here:", err)
+	}
+	if err := Save(link, "", "theme", String("gruvbox")); err != nil {
+		t.Fatal(err)
+	}
+	if st, _ := os.Lstat(link); st.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("config.toml is no longer a symlink")
+	}
+	if b, _ := os.ReadFile(real); !strings.Contains(string(b), `theme = "gruvbox"`) {
+		t.Errorf("linked file:\n%s", b)
+	}
+}
+
+func TestMakeLeavesExistingFile(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.toml")
+	if created, err := Make(p); !created || err != nil {
+		t.Fatalf("first Make: created %v, %v", created, err)
+	}
+	os.WriteFile(p, []byte("theme = \"nord\"\n"), 0o644)
+	if created, err := Make(p); created || err != nil {
+		t.Fatalf("second Make: created %v, %v", created, err)
+	}
+	if b, _ := os.ReadFile(p); string(b) != "theme = \"nord\"\n" {
+		t.Errorf("Make overwrote the file: %q", b)
+	}
+}
+
+func TestUpdateFile(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "config.toml")
+	os.WriteFile(p, []byte("theme = \"nord\"\n"), 0o644)
+	added, created, err := Update(p)
+	if err != nil || created || len(added) == 0 {
+		t.Fatalf("added %v created %v err %v", added, created, err)
+	}
+	c, _, errs := Load(p)
+	if len(errs) != 0 || c.Theme != "nord" {
+		t.Errorf("after update: theme %q errs %v", c.Theme, errs)
+	}
+	before, _ := os.ReadFile(p)
+	if added, _, err := Update(p); err != nil || len(added) != 0 {
+		t.Errorf("second update added %v (%v)", added, err)
+	}
+	if after, _ := os.ReadFile(p); string(after) != string(before) {
+		t.Error("second update changed the file")
+	}
+
+	// A missing file is created, as by Make.
+	q := filepath.Join(t.TempDir(), "new.toml")
+	if _, created, err := Update(q); !created || err != nil {
+		t.Errorf("missing file: created %v, %v", created, err)
+	}
+}

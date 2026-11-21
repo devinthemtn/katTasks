@@ -73,3 +73,13 @@ func TestNormalize(t *testing.T) {
 		}
 	}
 }
+
+// A first line holding only a byte order mark is blank, not an empty task.
+func TestLoadSkipsBOMOnlyLine(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "todo.txt")
+	os.WriteFile(p, []byte(bom+"\none\n"), 0o644)
+	ts, _, err := Load(p)
+	if err != nil || len(ts) != 1 || ts[0].Text != "one" {
+		t.Fatalf("loaded %d tasks (%v)", len(ts), err)
+	}
+}

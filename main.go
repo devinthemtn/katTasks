@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -20,7 +21,20 @@ import (
 )
 
 func main() {
-	fs := flag.CommandLine
+	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+// run is katTasks with the given arguments (without the program name) and
+// streams, and returns its exit code: 0, 1 for an error, 2 for a mistake
+// in how it was run.
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	fail := func(err error) int {
+		fmt.Fprintln(stderr, "katTasks:", err)
+		return 1
+	}
+
+	fs := flag.NewFlagSet("katTasks", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 	cfgPath := fs.String("config", config.DefaultPath(), "settings file")
 	todoFile := fs.String("file", "", "todo.txt to open (overrides files.todo)")
 	makeConfig := fs.Bool("makeconfig", false, "create the settings file with every default, then exit")
@@ -31,33 +45,37 @@ func main() {
 	asJSON := fs.Bool("json", false, "commands print JSON")
 	force := fs.Bool("f", false, "commands don't ask before deleting")
 	fs.Usage = func() { printUsage(fs, *cfgPath) }
-	parseFlags(fs, os.Args[1:])
+	if code, ok := parseFlags(fs, args, stdout); !ok {
+		return code
+	}
 	if fs.Arg(0) == "help" { // katTasks help, like -h
-		fs.SetOutput(os.Stdout)
+		fs.SetOutput(stdout)
 		fs.Usage()
-		return
+		return 0
 	}
 
 	switch {
 	case *showVersion:
-		fmt.Println("katTasks", Version())
-		return
+		fmt.Fprintln(stdout, "katTasks", Version())
+		return 0
 	case *showPaths:
 		cfg, _, _ := config.Load(*cfgPath)
 		if *todoFile != "" {
 			cfg.SetTodo(*todoFile)
 		}
-		fmt.Printf("settings: %s\ntodo: %s\ndone: %s\n", *cfgPath, cfg.Files.Todo, cfg.Files.Done)
-		return
+		fmt.Fprintf(stdout, "settings: %s\ntodo: %s\ndone: %s\n", *cfgPath, cfg.Files.Todo, cfg.Files.Done)
+		return 0
 	case *makeConfig:
 		created, err := config.Make(*cfgPath)
-		exitIf(err)
-		if created {
-			fmt.Println("created", *cfgPath)
-		} else {
-			fmt.Println(*cfgPath, "already exists; left unchanged (try -updateconfig)")
+		if err != nil {
+			return fail(err)
 		}
-		return
+		if created {
+			fmt.Fprintln(stdout, "created", *cfgPath)
+		} else {
+			fmt.Fprintln(stdout, *cfgPath, "already exists; left unchanged (try -updateconfig)")
+		}
+		return 0
 	case *makeTheme != "":
 		cfg, _, _ := config.Load(*cfgPath)
 		themes, _ := theme.Load(cfg.Dir())
@@ -66,24 +84,28 @@ func main() {
 			cur, _ = theme.Find(themes, "default")
 		}
 		p, err := theme.Write(cfg.Dir(), *makeTheme, cur)
-		exitIf(err)
-		fmt.Printf("wrote %s (a copy of %q); set theme = %q to use it\n", p, cur.Name, *makeTheme)
-		return
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Fprintf(stdout, "wrote %s (a copy of %q); set theme = %q to use it\n", p, cur.Name, *makeTheme)
+		return 0
 	case *updateConfig:
 		added, created, err := config.Update(*cfgPath)
-		exitIf(err)
+		if err != nil {
+			return fail(err)
+		}
 		switch {
 		case created:
-			fmt.Println("created", *cfgPath)
+			fmt.Fprintln(stdout, "created", *cfgPath)
 		case len(added) == 0:
-			fmt.Println(*cfgPath, "already has every setting")
+			fmt.Fprintln(stdout, *cfgPath, "already has every setting")
 		default:
-			fmt.Printf("added %d setting(s) to %s as comments:\n", len(added), *cfgPath)
+			fmt.Fprintf(stdout, "added %d setting(s) to %s as comments:\n", len(added), *cfgPath)
 			for _, a := range added {
-				fmt.Println("  " + a)
+				fmt.Fprintln(stdout, "  "+a)
 			}
 		}
-		return
+		return 0
 	}
 	cfg, created, errs := config.Load(*cfgPath)
 	if *todoFile != "" {
@@ -91,43 +113,52 @@ func main() {
 	}
 
 	if fs.Arg(0) == "remind" {
-		remind(fs.Args()[1:], *cfgPath, *todoFile)
-		return
+		return remind(fs.Args()[1:], *cfgPath, *todoFile, stdout, stderr)
 	}
 	if fs.NArg() > 0 {
 		if !cli.IsCommand(fs.Arg(0)) {
-			fmt.Fprintf(os.Stderr, "katTasks: unknown command %q\n\n", fs.Arg(0))
+			fmt.Fprintf(stderr, "katTasks: unknown command %q\n\n", fs.Arg(0))
 			fs.Usage()
-			os.Exit(2)
+			return 2
 		}
 		for _, e := range errs {
-			fmt.Fprintln(os.Stderr, "katTasks: warning:", e)
+			fmt.Fprintln(stderr, "katTasks: warning:", e)
 		}
-		err := cli.Run(cli.Env{Cfg: cfg, JSON: *asJSON, Force: *force, In: os.Stdin, Out: os.Stdout}, fs.Args())
+		err := cli.Run(cli.Env{Cfg: cfg, JSON: *asJSON, Force: *force, In: stdin, Out: stdout}, fs.Args())
 		if errors.Is(err, cli.ErrUsage) {
-			fmt.Fprintln(os.Stderr, "katTasks:", err)
-			os.Exit(2)
+			fmt.Fprintln(stderr, "katTasks:", err)
+			return 2
 		}
-		exitIf(err)
-		return
+		if err != nil {
+			return fail(err)
+		}
+		return 0
 	}
 
 	if created {
-		fmt.Fprintf(os.Stderr, "katTasks: wrote default settings to %s\n", *cfgPath)
+		fmt.Fprintf(stderr, "katTasks: wrote default settings to %s\n", *cfgPath)
 	}
 	m, err := ui.New(cfg, ui.Options{ConfigPath: *cfgPath, TodoFile: *todoFile, Errors: errs, Version: Version()})
-	exitIf(err)
+	if err != nil {
+		return fail(err)
+	}
 	ctx, stop := context.WithCancel(context.Background())
 	defer stop()
 	go alert.Watch(ctx, alert.Options{Source: alert.FileSource(*cfgPath, *todoFile)})
 	if _, err := tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
-		exitIf(err)
+		return fail(err)
 	}
+	return 0
 }
 
 // remind is the katTasks remind command: the background reminder.
-func remind(args []string, cfgPath, todoFile string) {
+func remind(args []string, cfgPath, todoFile string, stdout, stderr io.Writer) int {
+	fail := func(err error) int {
+		fmt.Fprintln(stderr, "katTasks:", err)
+		return 1
+	}
 	rf := flag.NewFlagSet("remind", flag.ContinueOnError)
+	rf.SetOutput(stderr)
 	test := rf.Bool("test", false, "send a sample alert now, with the [alerts] settings, then exit")
 	testAlarm := rf.Bool("test-alarm", false, "ring a sample alarm now, with the [alarms] settings, then exit")
 	install := rf.Bool("install", false, "start katTasks remind at login")
@@ -137,23 +168,31 @@ func remind(args []string, cfgPath, todoFile string) {
 			"Without a flag it runs until stopped, sending the [alerts] and ringing the\n[alarms] of %s.\n\n", cfgPath)
 		rf.PrintDefaults()
 	}
-	parseFlags(rf, args)
+	if code, ok := parseFlags(rf, args, stdout); !ok {
+		return code
+	}
 
 	switch {
 	case *test:
 		cfg, _, _ := config.Load(cfgPath)
 		s := alert.SettingsOf(cfg)
 		if !s.Popup && !s.Sound {
-			exitIf(errors.New("alerts.popup and alerts.sound are both off"))
+			return fail(errors.New("alerts.popup and alerts.sound are both off"))
 		}
-		exitIf(alert.Test(s))
-		fmt.Println("sent a test alert")
+		if err := alert.Test(s); err != nil {
+			return fail(err)
+		}
+		fmt.Fprintln(stdout, "sent a test alert")
 	case *testAlarm:
 		cfg, _, _ := config.Load(cfgPath)
 		s, err := alert.AlarmSettingsOf(cfg)
-		exitIf(err)
-		fmt.Printf("ringing for %s…\n", cfg.Alarms.Ring)
-		exitIf(alert.TestAlarm(s))
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Fprintf(stdout, "ringing for %s…\n", cfg.Alarms.Ring)
+		if err := alert.TestAlarm(s); err != nil {
+			return fail(err)
+		}
 	case *install:
 		// The same settings and todo file as this run.
 		var argv []string
@@ -166,45 +205,45 @@ func remind(args []string, cfgPath, todoFile string) {
 			argv = append(argv, "-file", abs)
 		}
 		msg, err := alert.Install(append(argv, "remind"))
-		exitIf(err)
-		fmt.Println(msg)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Fprintln(stdout, msg)
 	case *uninstall:
 		msg, err := alert.Uninstall()
-		exitIf(err)
-		fmt.Println(msg)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Fprintln(stdout, msg)
 	default:
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
 		alert.Watch(ctx, alert.Options{
 			Source: alert.FileSource(cfgPath, todoFile),
-			Logf:   func(f string, a ...any) { fmt.Fprintf(os.Stderr, "katTasks: "+f+"\n", a...) },
+			Logf:   func(f string, a ...any) { fmt.Fprintf(stderr, "katTasks: "+f+"\n", a...) },
 		})
 	}
+	return 0
 }
 
 // parseFlags parses args with fs. Help asked for with -h or -help goes to
-// stdout, so it can be piped to less, and exits 0; a mistake in the flags
-// is reported on stderr with the help after it, and exits 2.
-func parseFlags(fs *flag.FlagSet, args []string) {
+// stdout, so it can be piped to less; a mistake in the flags is reported
+// on the flag set's output with the help after it. It returns false when
+// katTasks should stop, with the exit code: 0 after help, 2 after a
+// mistake.
+func parseFlags(fs *flag.FlagSet, args []string, stdout io.Writer) (code int, ok bool) {
 	usage := fs.Usage
 	fs.Usage = func() {} // printed below, to the right place
-	fs.Init(fs.Name(), flag.ContinueOnError)
 	err := fs.Parse(args)
 	fs.Usage = usage
 	switch {
 	case errors.Is(err, flag.ErrHelp):
-		fs.SetOutput(os.Stdout)
+		fs.SetOutput(stdout)
 		usage()
-		os.Exit(0)
+		return 0, false
 	case err != nil: // flag has printed what was wrong
 		usage()
-		os.Exit(2)
+		return 2, false
 	}
-}
-
-func exitIf(err error) {
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "katTasks:", err)
-		os.Exit(1)
-	}
+	return 0, true
 }

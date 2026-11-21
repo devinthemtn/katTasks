@@ -40,7 +40,7 @@ func read(t *testing.T, path string) string {
 // tempFiles lists save's leftover temp files in dir.
 func tempFiles(t *testing.T, dir string) []string {
 	t.Helper()
-	m, _ := filepath.Glob(filepath.Join(dir, ".todo-*.tmp"))
+	m, _ := filepath.Glob(filepath.Join(dir, ".*.tmp"))
 	return m
 }
 

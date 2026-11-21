@@ -95,8 +95,10 @@ func (t *Task) String() string {
 		b.WriteString(t.Created.Format(DateLayout))
 		b.WriteByte(' ')
 	}
-	b.WriteString(t.Text)
-	return strings.TrimRight(b.String(), " \t")
+	// Only the text loses trailing space: a task with a header and no text
+	// keeps the space after the header, or "x " would read back as "x".
+	b.WriteString(strings.TrimRight(t.Text, " \t"))
+	return b.String()
 }
 
 // line is the task as it goes in the file: the line it was read from if

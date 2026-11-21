@@ -45,7 +45,7 @@ func fileModel(t *testing.T, o fileOpts, lines ...string) Model {
 	if err := os.WriteFile(cfg.Files.Todo, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	m, err := New(cfg, Options{})
+	m, err := New(cfg, Options{ConfigPath: cfg.Path})
 	if err != nil {
 		t.Fatal(err)
 	}

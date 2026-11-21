@@ -237,14 +237,7 @@ func back(today time.Time, r todo.Recurrence) time.Time {
 	case 'y':
 		return today.AddDate(-r.N, 0, 0)
 	case 'b':
-		d := today
-		for n := r.N; n > 0; {
-			d = d.AddDate(0, 0, -1)
-			if wd := d.Weekday(); wd != time.Saturday && wd != time.Sunday {
-				n--
-			}
-		}
-		return d
+		return todo.AddBusinessDays(today, -r.N)
 	}
 	return today
 }

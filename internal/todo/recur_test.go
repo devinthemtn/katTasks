@@ -68,3 +68,45 @@ func TestNext(t *testing.T) {
 		t.Error("task without rec: recurred")
 	}
 }
+
+// AddBusinessDays must agree with counting weekdays one at a time, from
+// every day of the week, forwards and backwards.
+func TestAddBusinessDays(t *testing.T) {
+	slow := func(d time.Time, n int) time.Time {
+		step := 1
+		if n < 0 {
+			step, n = -1, -n
+		}
+		for n > 0 {
+			d = d.AddDate(0, 0, step)
+			if wd := d.Weekday(); wd != time.Saturday && wd != time.Sunday {
+				n--
+			}
+		}
+		return d
+	}
+	start := time.Date(2026, 3, 1, 0, 0, 0, 0, time.Local) // a Sunday
+	for day := 0; day < 7; day++ {
+		d := start.AddDate(0, 0, day)
+		for n := -40; n <= 40; n++ {
+			if got, want := AddBusinessDays(d, n), slow(d, n); !got.Equal(want) {
+				t.Errorf("%s %+db = %s, want %s", d.Format("Mon 2006-01-02"), n, got.Format("Mon 2006-01-02"), want.Format("Mon 2006-01-02"))
+			}
+		}
+	}
+}
+
+// A huge rec:Nb must not hang completing the task.
+func TestHugeBusinessRecurrence(t *testing.T) {
+	r, ok := ParseRecurrence("999999999b")
+	if !ok {
+		t.Fatal("not parsed")
+	}
+	done := make(chan time.Time, 1)
+	go func() { done <- r.Add(time.Date(2026, 3, 2, 0, 0, 0, 0, time.Local)) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("rec:999999999b took over 2s")
+	}
+}

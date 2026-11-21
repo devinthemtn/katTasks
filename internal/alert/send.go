@@ -22,9 +22,15 @@ func Test(s Settings) error {
 	return Send(Alert{Text: "This is how a katTasks reminder looks", At: now}, s)
 }
 
-// run runs a command, and turns a failure into an error that includes what
-// it printed.
-func run(name string, args []string, env []string, dir string) error {
+// run and lookPath reach the OS; tests replace them to see what would run.
+var (
+	run      = runCommand
+	lookPath = exec.LookPath
+)
+
+// runCommand runs a command, and turns a failure into an error that
+// includes what it printed.
+func runCommand(name string, args []string, env []string, dir string) error {
 	c := exec.Command(name, args...)
 	c.Env, c.Dir = env, dir
 	hide(c)
@@ -66,7 +72,7 @@ func TestAlarm(s Settings) error {
 // first returns the first of the programs that is on the PATH.
 func first(names ...string) string {
 	for _, n := range names {
-		if _, err := exec.LookPath(n); err == nil {
+		if _, err := lookPath(n); err == nil {
 			return n
 		}
 	}

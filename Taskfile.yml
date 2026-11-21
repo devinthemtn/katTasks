@@ -130,11 +130,20 @@ tasks:
       - '{{.STATICCHECK}} ./...'
       - cd {{.GUI_DIR}} && {{.STATICCHECK}} -tags {{.GUI_TAGS}} ./...
 
+  vuln:
+    desc: Check both modules for known vulnerabilities in the code they call
+    vars:
+      GOVULNCHECK: go run golang.org/x/vuln/cmd/govulncheck@v1.10.0
+    cmds:
+      - '{{.GOVULNCHECK}} ./...'
+      - cd {{.GUI_DIR}} && {{.GOVULNCHECK}} -tags {{.GUI_TAGS}} ./...
+
   # Everything CI checks, before you push.
   ci:
-    desc: Run lint and every test, as CI does
+    desc: Run lint, the vulnerability check and every test, as CI does
     cmds:
       - task: lint
+      - task: vuln
       - go test -race ./...
       - cd {{.GUI_DIR}} && go test -race -tags {{.GUI_TAGS}} ./...
       - cd {{.GUI_DIR}}/frontend && npm test --silent

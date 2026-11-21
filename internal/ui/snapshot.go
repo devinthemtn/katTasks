@@ -356,11 +356,9 @@ func (m Model) inputState() *Input {
 	case modeEdit:
 		in.Label = "Edit task"
 	case modeFilter:
-		in.Label = "filter"
-		in.Hint = "+proj @ctx due:+1w due:-3d due:overdue pri:A-C -word \"a phrase\" · enter keep · esc clear"
+		in.Label, in.Hint = "filter", m.inputHint()
 	case modeSaveName:
-		in.Label = "save search as"
-		in.Hint = "saves " + m.currentQuery() + " to [filters] in " + m.opts.ConfigPath
+		in.Label, in.Hint = "save search as", m.inputHint()
 	case modePalette:
 		in.Label = ":"
 		return in
@@ -372,8 +370,20 @@ func (m Model) inputState() *Input {
 	return in
 }
 
-// footerSegs mirrors viewFooter, for the modes whose text isn't drawn
-// elsewhere in the window.
+// inputHint is the help under the search and save-search inputs.
+func (m Model) inputHint() string {
+	switch m.mode {
+	case modeFilter:
+		return "+proj @ctx due:+1w due:-3d due:overdue pri:A-C -word \"a phrase\" · enter keep · esc clear"
+	case modeSaveName:
+		return "saves " + m.currentQuery() + " to [filters] in " + m.opts.ConfigPath
+	}
+	return ""
+}
+
+// footerSegs is the footer for the modes whose text isn't drawn elsewhere
+// in the window. The terminal draws it too (viewFooter), except where it
+// has the input or buttons to show.
 func (m Model) footerSegs() [2][]Seg {
 	var l1, l2 []Seg
 	switch m.mode {

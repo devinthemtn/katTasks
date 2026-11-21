@@ -36,16 +36,6 @@ func (k Kind) String() string {
 	return [...]string{"all", "due", "header", "project", "context", "saved"}[k]
 }
 
-// ParseKind is the inverse of String; unknown names are All.
-func ParseKind(s string) Kind {
-	for k := All; k <= Saved; k++ {
-		if k.String() == s {
-			return k
-		}
-	}
-	return All
-}
-
 // Entry is one row of the sidebar.
 type Entry struct {
 	Kind  Kind

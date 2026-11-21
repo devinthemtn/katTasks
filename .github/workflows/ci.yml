@@ -18,6 +18,7 @@ concurrency:
 
 env:
   STATICCHECK_VERSION: v0.8.2
+  GOVULNCHECK_VERSION: v1.10.0
   WAILS_VERSION: v3.0.0
 
 jobs:
@@ -56,6 +57,13 @@ jobs:
         env:
           GOTOOLCHAIN: auto
         run: go run honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION ./...
+
+      # Known vulnerabilities in the code katTasks actually calls.
+      - name: govulncheck
+        if: runner.os == 'Linux'
+        env:
+          GOTOOLCHAIN: auto
+        run: go run golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION ./...
 
       - name: go test
         run: go test -race ./...
@@ -97,6 +105,9 @@ jobs:
 
       - name: staticcheck
         run: go run honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION -tags gtk3 ./...
+
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION -tags gtk3 ./...
 
       - name: go test
         run: go test -race -tags gtk3 ./...

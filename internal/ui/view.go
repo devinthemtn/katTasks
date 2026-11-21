@@ -246,7 +246,23 @@ type row struct {
 }
 
 func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
-	on := func(s lipgloss.Style) lipgloss.Style {
+	on := m.rowStyle(r)
+	prefix := m.taskPrefix(t, r, on)
+	badge := m.taskBadges(t, now, on)
+	text := m.taskWords(t, r, on)
+
+	avail := max(w-lipgloss.Width(prefix)-lipgloss.Width(badge), 4)
+	if lipgloss.Width(text) > avail {
+		text = ansi.Truncate(text, avail-1, "") + on(m.st.faint).Render("…")
+	}
+	pad := w - lipgloss.Width(prefix) - lipgloss.Width(text) - lipgloss.Width(badge)
+	return prefix + text + on(m.st.text).Render(strings.Repeat(" ", max(pad, 0))) + badge
+}
+
+// rowStyle returns what a style becomes on the row: with the cursor's
+// background on the cursor row, or the selection's on a marked one.
+func (m Model) rowStyle(r row) func(lipgloss.Style) lipgloss.Style {
+	return func(s lipgloss.Style) lipgloss.Style {
 		switch {
 		case r.cursor && r.focused:
 			return s.Background(m.st.cursorBg)
@@ -255,6 +271,11 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 		}
 		return s
 	}
+}
+
+// taskPrefix is the start of a row: the cursor or mark, the task number if
+// shown, the checkbox and the priority.
+func (m Model) taskPrefix(t *todo.Task, r row, on func(lipgloss.Style) lipgloss.Style) string {
 	marker := on(m.st.prompt).Render(" ")
 	switch {
 	case r.cursor:
@@ -275,7 +296,12 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 	if t.Priority != 0 {
 		pri = on(m.st.priority(t.Priority)).Render("(" + string(t.Priority) + ") ")
 	}
+	return marker + box + pri
+}
 
+// taskBadges is the end of a row: status, progress, alarm, recurrence and
+// due date.
+func (m Model) taskBadges(t *todo.Task, now time.Time, on func(lipgloss.Style) lipgloss.Style) string {
 	badge := ""
 	status, doing, progress := listview.WorkLabels(t)
 	if status != "" {
@@ -307,10 +333,14 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 	} else if badge != "" {
 		badge += on(m.st.text).Render(" ")
 	}
+	return badge
+}
 
+// taskWords is the task's text with its words colored: projects, contexts,
+// tags and search matches. Tags shown as badges, and hidden ones, are left
+// out.
+func (m Model) taskWords(t *todo.Task, r row, on func(lipgloss.Style) lipgloss.Style) string {
 	_, hasDue := t.Due()
-
-	// Description, coloring tokens. The due: tag is shown as the badge instead.
 	var parts []string
 	for _, word := range strings.Fields(t.Text) {
 		st := m.st.text
@@ -337,18 +367,7 @@ func (m Model) renderTask(t *todo.Task, r row, w int, now time.Time) string {
 		}
 		parts = append(parts, st.Render(word))
 	}
-	text := strings.Join(parts, on(m.st.text).Render(" "))
-
-	prefix := marker + box + pri
-	avail := w - lipgloss.Width(prefix) - lipgloss.Width(badge)
-	if avail < 4 {
-		avail = 4
-	}
-	if lipgloss.Width(text) > avail {
-		text = ansi.Truncate(text, avail-1, "") + on(m.st.faint).Render("…")
-	}
-	pad := w - lipgloss.Width(prefix) - lipgloss.Width(text) - lipgloss.Width(badge)
-	return prefix + text + on(m.st.text).Render(strings.Repeat(" ", max(pad, 0))) + badge
+	return strings.Join(parts, on(m.st.text).Render(" "))
 }
 
 func isTag(w string) bool { return listview.IsTag(w) }
@@ -371,19 +390,9 @@ func (m Model) viewFooter() string {
 		label := map[mode]string{modeFilter: "filter", modeSaveName: "save search as"}[m.mode]
 		l1 = m.st.prompt.Render(" "+label+" › ") + m.input.View()
 		if len(m.sugg) > 0 {
-			var ss []string
-			for i, s := range m.sugg {
-				if i == m.suggIdx {
-					ss = append(ss, m.st.suggestOn.Render(s))
-				} else {
-					ss = append(ss, m.st.suggest.Render(" "+s+" "))
-				}
-			}
-			l2 = " " + strings.Join(ss, "") + m.st.faint.Render("   tab complete · ↑↓ choose")
-		} else if m.mode == modeFilter {
-			l2 = m.st.faint.Render(" +proj @ctx due:+1w due:-3d due:overdue pri:A-C -word \"a phrase\" · enter keep · esc clear")
-		} else if m.mode == modeSaveName {
-			l2 = m.st.faint.Render(" saves " + m.currentQuery() + " to [filters] in " + m.opts.ConfigPath)
+			l2 = " " + m.suggestionChips() + m.st.faint.Render("   tab complete · ↑↓ choose")
+		} else if hint := m.inputHint(); hint != "" {
+			l2 = m.st.faint.Render(" " + hint)
 		}
 	case modeConfirm:
 		l1 = m.st.prompt.Render(" " + m.confirm)
@@ -394,38 +403,53 @@ func (m Model) viewFooter() string {
 			yes = m.st.suggestOn.Render("y yes")
 		}
 		l2 = " " + yes + "  " + no + m.st.faint.Render("   ←→ choose · enter ok")
-	case modePriority:
-		l1 = m.st.prompt.Render(" priority › ") + m.st.faint.Render("press A–Z, space to clear, esc to cancel")
-	case modeTheme:
-		l1 = m.st.prompt.Render(" theme › ") + m.st.text.Render(m.theme)
-	case modePalette:
-		l1 = m.st.faint.Render(" type to search commands · ↑↓ choose · enter run · esc close")
 	default:
-		if m.status != "" {
-			st := m.st.ok
-			if m.statusErr {
-				st = m.st.err
-			}
-			l1 = " " + st.Render(m.status)
-		} else if m.configWarn != "" {
-			l1 = " " + m.st.err.Render("⚠ "+m.configWarn) + m.st.faint.Render("  (fix, then ctrl+r)")
-		}
-		l2 = " " + m.shortHelp()
-		if m.calendar {
-			l2 = " " + m.st.faint.Render(calendarHelp)
-		}
-		if m.agenda {
-			l2 = " " + m.st.faint.Render(agendaHelp)
-		}
-		if m.visual {
-			l2 = m.st.suggestOn.Render(fmt.Sprintf("VISUAL %d", len(m.sel))) + " " +
-				m.st.faint.Render("space mark · x done · d delete · p priority · yy copy · esc leave")
-		}
-		if m.pending != "" {
-			l2 = m.st.suggestOn.Render(displayKey(m.pending)+"…") + " " + l2
-		}
+		// The same lines as the desktop app's footer.
+		segs := m.footerSegs()
+		l1, l2 = m.footerLine(segs[0]), m.footerLine(segs[1])
 	}
 	return ansi.Truncate(l1, m.width, "…") + "\n" + ansi.Truncate(l2, m.width, "…")
+}
+
+// suggestionChips are the completions, the highlighted one picked out.
+func (m Model) suggestionChips() string {
+	var ss []string
+	for i, s := range m.sugg {
+		if i == m.suggIdx {
+			ss = append(ss, m.st.suggestOn.Render(s))
+		} else {
+			ss = append(ss, m.st.suggest.Render(" "+s+" "))
+		}
+	}
+	return strings.Join(ss, "")
+}
+
+// footerLine draws one line of footerSegs in the terminal's styles,
+// indented one space unless it starts with a chip, which is padded.
+func (m Model) footerLine(segs []Seg) string {
+	if len(segs) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	if segs[0].Style != "chip" {
+		b.WriteByte(' ')
+	}
+	for _, sg := range segs {
+		if st, ok := m.segStyles()[sg.Style]; ok {
+			b.WriteString(st.Render(sg.Text))
+		} else {
+			b.WriteString(sg.Text)
+		}
+	}
+	return b.String()
+}
+
+// segStyles are the terminal styles for footerSegs' style names.
+func (m Model) segStyles() map[string]lipgloss.Style {
+	return map[string]lipgloss.Style{
+		"prompt": m.st.prompt, "dim": m.st.faint, "fg": m.st.text, "ok": m.st.ok,
+		"error": m.st.err, "chip": m.st.suggestOn, "key": m.st.helpKey,
+	}
 }
 
 func clipLines(s string, n int) string {
@@ -434,19 +458,6 @@ func clipLines(s string, n int) string {
 		lines = lines[:n]
 	}
 	return strings.Join(lines, "\n")
-}
-
-// shortHelp is the one-line key summary in the footer.
-func (m Model) shortHelp() string {
-	var parts []string
-	for _, name := range shortHelpActions {
-		ks := m.km.keysFor(name)
-		if len(ks) == 0 {
-			continue
-		}
-		parts = append(parts, m.st.helpKey.Render(ks[0])+" "+m.st.faint.Render(shortLabel(name)))
-	}
-	return strings.Join(parts, m.st.faint.Render(" • "))
 }
 
 // fullHelp lists every bound action, one column per group.

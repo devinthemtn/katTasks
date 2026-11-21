@@ -137,12 +137,27 @@ tasks:
       - task: build
       - task: build-gui
       - install -m 755 {{.BIN_DIR}}/katTasks{{.EXE}} {{.GUI_DIR}}/bin/katTasks-gui{{.EXE}} "{{.BINDIR}}/"
+      # Lowercase kattasks and kattasks-gui links, so either spelling runs
+      # them. Each is skipped when it already is the original: on a
+      # case-insensitive filesystem (macOS, Windows) the names are one file,
+      # and ln -sf would replace it.
+      - cmd: |
+          cd "{{.BINDIR}}"
+          for n in katTasks katTasks-gui; do
+            l=$(echo "$n" | tr A-Z a-z)
+            [ "$l" -ef "$n" ] || ln -sf "$n" "$l"
+          done
+        platforms: [linux, darwin]
       - |
         printf '\nInstalled into %s:\n' "$(echo "{{.BINDIR}}" | sed "s|^$HOME/|~/|")"
         for p in "katTasks:the terminal app and commands" "katTasks-gui:the desktop app"; do
           name=${p%%:*}
           v=$("{{.BINDIR}}/$name{{.EXE}}" -version 2>/dev/null | sed 's/^[^ ]* //')
           printf '  %-17s %-30s %s\n' "$name" "${p#*:}" "${v:-?}"
+        done
+        for n in katTasks katTasks-gui; do
+          l=$(echo "$n" | tr A-Z a-z)
+          [ -L "{{.BINDIR}}/$l" ] && printf '  %-17s %s\n' "$l" "the same as $n"
         done
         case ":$PATH:" in
           *":{{.BINDIR}}:"*) ;;

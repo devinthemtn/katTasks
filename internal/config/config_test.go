@@ -21,9 +21,10 @@ func TestDefaultsMatchFile(t *testing.T) {
 }
 
 func TestDoneFollowsTodo(t *testing.T) {
-	c, errs := Parse("[files]\ntodo = \"/x/y/todo.txt\"\n")
-	if len(errs) != 0 || c.Files.Done != "/x/y/done.txt" {
-		t.Fatalf("done = %q, errs %v", c.Files.Done, errs)
+	dir := t.TempDir() // an absolute path on every OS
+	c, errs := Parse("[files]\ntodo = '" + filepath.Join(dir, "todo.txt") + "'\n")
+	if want := filepath.Join(dir, "done.txt"); len(errs) != 0 || c.Files.Done != want {
+		t.Fatalf("done = %q, want %q, errs %v", c.Files.Done, want, errs)
 	}
 }
 
@@ -171,7 +172,7 @@ func TestReadmeListsSettings(t *testing.T) {
 	if err != nil {
 		t.Skip(err)
 	}
-	readme := string(b)
+	readme := strings.ReplaceAll(string(b), "\r\n", "\n") // git may check it out with CRLF
 	start := strings.Index(readme, "## Settings")
 	end := strings.Index(readme[start:], "## Keys")
 	block := readme[start : start+end]

@@ -56,15 +56,6 @@ func (m *Model) openInEditor(path string) tea.Cmd {
 	return tea.ExecProcess(c, func(err error) tea.Msg { return editorDoneMsg{path, err} })
 }
 
-// editorCommand runs the editor command line ed (which may carry flags,
-// like "emacsclient -t") on path, through the shell as git does.
-func editorCommand(ed, path string) *exec.Cmd {
-	if runtime.GOOS == "windows" {
-		return exec.Command("cmd", "/c", ed+` "`+path+`"`)
-	}
-	return exec.Command("sh", "-c", ed+` "$1"`, "sh", path)
-}
-
 // systemOpen opens path with the system's default app for it.
 func systemOpen(path string) error {
 	var c *exec.Cmd

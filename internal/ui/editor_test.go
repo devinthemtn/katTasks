@@ -3,6 +3,8 @@ package ui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -36,7 +38,11 @@ func TestGUIOpensVisual(t *testing.T) {
 		m.opts.ConfigPath = m.cfg.Path
 		dir := filepath.Dir(m.opts.ConfigPath)
 		out := filepath.Join(t.TempDir(), "opened")
-		t.Setenv("VISUAL", "printf '%s' >"+out)
+		visual := "printf '%s' >" + out
+		if runtime.GOOS == "windows" {
+			visual = "echo>" + out // writes the quoted path and a line break
+		}
+		t.Setenv("VISUAL", visual)
 		t.Setenv("EDITOR", "false")
 		done := make(chan Snapshot, 1)
 		h := NewHeadless(m, HeadlessOptions{Changed: func(s Snapshot) { done <- s }})
@@ -47,7 +53,8 @@ func TestGUIOpensVisual(t *testing.T) {
 			t.Fatalf("%s: the editor never finished", tc.action)
 		}
 		b, _ := os.ReadFile(out)
-		if want := filepath.Join(dir, tc.want); filepath.Clean(string(b)) != filepath.Clean(want) {
+		got := strings.Trim(string(b), "\" \r\n")
+		if want := filepath.Join(dir, tc.want); filepath.Clean(got) != filepath.Clean(want) {
 			t.Errorf("%s opened %q, want %q", tc.action, b, want)
 		}
 		if m := h.model(); m.statusErr || m.status == "" {

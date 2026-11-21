@@ -49,8 +49,12 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+      # staticcheck needs a newer Go than go.mod's minimum, which the tests
+      # run on; auto downloads it just to build staticcheck.
       - name: staticcheck
         if: runner.os == 'Linux'
+        env:
+          GOTOOLCHAIN: auto
         run: go run honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION ./...
 
       - name: go test

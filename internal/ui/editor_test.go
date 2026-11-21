@@ -50,8 +50,8 @@ func TestGUIOpensVisual(t *testing.T) {
 		if want := filepath.Join(dir, tc.want); filepath.Clean(string(b)) != filepath.Clean(want) {
 			t.Errorf("%s opened %q, want %q", tc.action, b, want)
 		}
-		if h.m.statusErr || h.m.status == "" {
-			t.Errorf("%s: after the editor, status %q (err %v); want the settings reloaded", tc.action, h.m.status, h.m.statusErr)
+		if m := h.model(); m.statusErr || m.status == "" {
+			t.Errorf("%s: after the editor, status %q (err %v); want the settings reloaded", tc.action, m.status, m.statusErr)
 		}
 	}
 }

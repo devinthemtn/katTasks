@@ -120,6 +120,25 @@ tasks:
       - go vet ./...
       - cd {{.GUI_DIR}} && go vet -tags {{.GUI_TAGS}} ./...
 
+  lint:
+    desc: gofmt, go vet and staticcheck on both modules (what CI runs)
+    vars:
+      STATICCHECK: go run honnef.co/go/tools/cmd/staticcheck@v0.8.2
+    cmds:
+      - task: vet
+      - test -z "$(gofmt -l .)" || { echo "Not gofmt'ed:"; gofmt -l .; exit 1; }
+      - '{{.STATICCHECK}} ./...'
+      - cd {{.GUI_DIR}} && {{.STATICCHECK}} -tags {{.GUI_TAGS}} ./...
+
+  # Everything CI checks, before you push.
+  ci:
+    desc: Run lint and every test, as CI does
+    cmds:
+      - task: lint
+      - go test -race ./...
+      - cd {{.GUI_DIR}} && go test -race -tags {{.GUI_TAGS}} ./...
+      - cd {{.GUI_DIR}}/frontend && npm test --silent
+
   check-frontend:
     desc: Type-check the Svelte frontend
     deps: [bindings]

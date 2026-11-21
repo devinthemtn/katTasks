@@ -1,0 +1,113 @@
+name: ci
+
+# Runs on every push and pull request: vet, staticcheck and the tests (with
+# the race detector) for both Go modules, plus the GUI frontend's unit tests
+# and type check. Releases are built by release.yml.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  STATICCHECK_VERSION: v0.8.2
+  WAILS_VERSION: v3.0.0
+
+jobs:
+  # The terminal app: cross-platform, so it is tested on all three OSes.
+  katTasks:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-latest, windows-latest]
+    name: katTasks (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: go mod tidy
+        if: runner.os == 'Linux'
+        run: go mod tidy -diff
+
+      - name: gofmt
+        if: runner.os == 'Linux'
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then echo "Not gofmt'ed:"; echo "$out"; exit 1; fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: staticcheck
+        if: runner.os == 'Linux'
+        run: go run honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION ./...
+
+      - name: go test
+        run: go test -race ./...
+
+  # The desktop app's Go module and its Svelte frontend (Linux only: the
+  # other platforms are built, not tested, by release.yml).
+  gui:
+    name: katTasks-gui
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: katTasks-gui
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: katTasks-gui/go.mod
+          cache-dependency-path: katTasks-gui/go.sum
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: katTasks-gui/frontend/package-lock.json
+
+      - name: Install Linux libraries
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      # Built without cgo: its cgo build needs GTK 4 and WebKitGTK 6.
+      - name: Install wails3
+        run: CGO_ENABLED=0 go install github.com/wailsapp/wails/v3/cmd/wails3@$WAILS_VERSION
+
+      - name: go mod tidy
+        run: go mod tidy -diff
+
+      - name: go vet
+        run: go vet -tags gtk3 ./...
+
+      - name: staticcheck
+        run: go run honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION -tags gtk3 ./...
+
+      - name: go test
+        run: go test -race -tags gtk3 ./...
+
+      - name: Frontend unit tests
+        run: |
+          npm ci --prefix frontend
+          npm test --prefix frontend
+
+      # The bindings are committed; fail if they no longer match the Go code.
+      - name: Bindings are up to date
+        run: |
+          wails3 generate bindings -f '-tags gtk3' -clean=true -ts -i
+          git status --porcelain -- frontend/bindings
+          test -z "$(git status --porcelain -- frontend/bindings)"
+
+      - name: Frontend type check
+        run: npm run check --prefix frontend

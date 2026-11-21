@@ -70,7 +70,7 @@ func TestHeadlessAddAndToggle(t *testing.T) {
 	if !strings.HasPrefix(s.Footer[0][0].Text, "completed") || s.Footer[0][0].Style != "ok" {
 		t.Fatalf("status %+v", s.Footer[0])
 	}
-	data, _ := os.ReadFile(h.m.cfg.Files.Todo)
+	data, _ := os.ReadFile(h.model().cfg.Files.Todo)
 	if !strings.Contains(string(data), "x ") {
 		t.Fatalf("not saved as done:\n%s", data)
 	}
@@ -171,11 +171,13 @@ func TestHeadlessDoingAndProgress(t *testing.T) {
 			t.Errorf("tag %q shown in the text as well as the badge", w.Text)
 		}
 	}
-	data, _ := os.ReadFile(h.m.cfg.Files.Todo)
+	data, _ := os.ReadFile(h.model().cfg.Files.Todo)
 	if strings.TrimSpace(string(data)) != "Old task status:doing progress:40" {
 		t.Fatalf("saved %q", data)
 	}
-	if !strings.Contains(h.m.renderTask(h.m.tasks[0], row{}, 100, time.Now()), "▶ doing ▰▰▱▱▱ 40%") {
+	var line string
+	h.with(func(m *Model) { line = m.renderTask(m.tasks[0], row{}, 100, time.Now()) })
+	if !strings.Contains(line, "▶ doing ▰▰▱▱▱ 40%") {
 		t.Error("terminal row has no badge")
 	}
 
@@ -183,7 +185,7 @@ func TestHeadlessDoingAndProgress(t *testing.T) {
 	if r := s.Rows[0]; r.Status != "" || r.Progress != "" {
 		t.Fatalf("after stopping: %+v", r)
 	}
-	data, _ = os.ReadFile(h.m.cfg.Files.Todo)
+	data, _ = os.ReadFile(h.model().cfg.Files.Todo)
 	if strings.TrimSpace(string(data)) != "Old task" {
 		t.Fatalf("saved %q", data)
 	}
@@ -273,7 +275,7 @@ func TestAlarmPicker(t *testing.T) {
 	if a.Time != "7:00" || !strings.Contains(a.When, start.Format("Jan 2")) {
 		t.Fatalf("starts at %q %q", a.When, a.Time)
 	}
-	if !strings.Contains(h.m.View(), "⏰ ALARM") {
+	if !strings.Contains(h.view(), "⏰ ALARM") {
 		t.Error("terminal popup doesn't show the picker")
 	}
 
@@ -342,26 +344,26 @@ func TestHelpScrolls(t *testing.T) {
 	h, _ := headless(t)
 	h.Resize(100, 14) // too short for the help screen
 	keys(h, "?")
-	first := h.m.View()
+	first := h.view()
 	if !strings.Contains(first, "↓ more") || strings.Contains(first, "TAGS & SEARCH") {
 		t.Fatalf("top of a short help screen:\n%s", first)
 	}
 	keys(h, "G")
-	if v := h.m.View(); !strings.Contains(v, "TAGS & SEARCH") || !strings.Contains(v, "the end") {
+	if v := h.view(); !strings.Contains(v, "TAGS & SEARCH") || !strings.Contains(v, "the end") {
 		t.Fatalf("bottom:\n%s", v)
 	}
-	if !h.m.showHelp {
+	if !h.model().showHelp {
 		t.Fatal("scrolling closed the help")
 	}
 	s := keys(h, "g", "j", "k", "x") // x isn't a scroll key: it closes
-	if h.m.showHelp || s.Help != nil {
+	if h.model().showHelp || s.Help != nil {
 		t.Error("x didn't close the help")
 	}
 
 	// Tall enough: everything shows and any key, j included, closes it.
 	h.Resize(200, 80)
 	keys(h, "?")
-	if v := h.m.View(); !strings.Contains(v, "TAGS & SEARCH") || strings.Contains(v, "↓ more") {
+	if v := h.view(); !strings.Contains(v, "TAGS & SEARCH") || strings.Contains(v, "↓ more") {
 		t.Fatalf("tall help:\n%s", v)
 	}
 	if s := keys(h, "?"); len(s.HelpTags) != 0 {
@@ -372,7 +374,7 @@ func TestHelpScrolls(t *testing.T) {
 		t.Error("snapshot lacks the help text for the GUI")
 	}
 	keys(h, "j")
-	if h.m.showHelp {
+	if h.model().showHelp {
 		t.Error("j didn't close a help screen that fits")
 	}
 }
@@ -407,27 +409,27 @@ func TestSuggestionArrowsAndEnter(t *testing.T) {
 
 func TestConfirmButtons(t *testing.T) {
 	h, _ := headless(t)
-	h.m.ask("delete it?", func(m *Model) { m.setStatus("deleted") })
+	h.with(func(m *Model) { m.ask("delete it?", func(m *Model) { m.setStatus("deleted") }) })
 	s := h.State()
 	if s.Mode != "confirm" || s.ConfirmNo {
 		t.Fatalf("yes should be highlighted first: %+v", s.Mode)
 	}
-	if s = h.Key("enter"); s.Mode != "normal" || h.m.status != "deleted" {
-		t.Fatalf("enter on yes: mode %s, status %q", s.Mode, h.m.status)
+	if s = h.Key("enter"); s.Mode != "normal" || h.model().status != "deleted" {
+		t.Fatalf("enter on yes: mode %s, status %q", s.Mode, h.model().status)
 	}
 
-	h.m.ask("delete it?", func(m *Model) { m.setStatus("deleted") })
+	h.with(func(m *Model) { m.ask("delete it?", func(m *Model) { m.setStatus("deleted") }) })
 	if s = h.Key("right"); !s.ConfirmNo {
 		t.Fatal("right should highlight no")
 	}
-	if s = h.Key("enter"); s.Mode != "normal" || h.m.status != "cancelled" {
-		t.Fatalf("enter on no: mode %s, status %q", s.Mode, h.m.status)
+	if s = h.Key("enter"); s.Mode != "normal" || h.model().status != "cancelled" {
+		t.Fatalf("enter on no: mode %s, status %q", s.Mode, h.model().status)
 	}
 
-	h.m.ask("delete it?", func(m *Model) { m.setStatus("deleted") })
+	h.with(func(m *Model) { m.ask("delete it?", func(m *Model) { m.setStatus("deleted") }) })
 	h.Key("tab")
-	if s = h.Key("y"); h.m.status != "deleted" {
-		t.Fatalf("y answers yes whatever is highlighted: %q", h.m.status)
+	if s = h.Key("y"); h.model().status != "deleted" {
+		t.Fatalf("y answers yes whatever is highlighted: %q", h.model().status)
 	}
 }
 
@@ -518,4 +520,27 @@ kat.replace("(" .. p .. ") " .. kat.input)`
 	if s.Input.Choice != nil || !strings.HasPrefix(s.Input.Value, "(C) Call mom") {
 		t.Fatalf("after clicking C: %q, list %+v", s.Input.Value, s.Input.Choice)
 	}
+}
+
+// The helpers below reach into the model under h's lock, since commands
+// such as chord and picker timers update it in the background.
+
+// with runs fn on the model.
+func (h *Headless) with(fn func(m *Model)) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	fn(&h.m)
+}
+
+// model returns a copy of the model, for reading its fields.
+func (h *Headless) model() Model {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.m
+}
+
+// view renders the terminal screen.
+func (h *Headless) view() (v string) {
+	h.with(func(m *Model) { v = m.View() })
+	return v
 }

@@ -190,7 +190,7 @@
 
   const popupHelp: Seg[][] = [
     [{ text: '(A) ', style: 'key' }, { text: 'priority, at the start', style: 'dim' }],
-    [{ text: '+project ', style: 'project' }, { text: '@context ', style: 'context' }, { text: 'key:value', style: 'tag' }],
+    [{ text: '+project ', style: 'project' }, { text: '@context ', style: 'context' }, { text: 'key:value ', style: 'tag' }, { text: '{{highlight}}', style: 'highlight' }],
     [{ text: 'due:', style: 'tag' }, { text: 'opens a calendar, or type today fri +3d 2026-12-01', style: 'dim' }],
     [{ text: 'rec:', style: 'tag' }, { text: '1w 3d 5b 1m 1y · rec:+1w counts from due', style: 'dim' }],
     [{ text: 'alarm:', style: 'tag' }, { text: 'opens a date and time picker; rings like an alarm clock', style: 'dim' }],

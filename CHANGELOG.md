@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Text inside `{{ }}` in a task is drawn in the theme's new `highlight`
+  color, in the terminal UI and the GUI. `{{` and `}}` may be several words
+  apart. Theme files that don't set it get it from their `base`.
+
 ## 1.0.0 (2026-11-21)
 
 ### What 1.0 promises

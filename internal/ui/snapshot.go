@@ -293,7 +293,9 @@ func (m Model) taskRow(t *todo.Task, hide map[string]bool, now time.Time) TaskRo
 			r.DueStyle = "dim"
 		}
 	}
-	for _, word := range strings.Fields(t.Text) {
+	words := strings.Fields(t.Text)
+	braced := listview.Braced(words)
+	for i, word := range words {
 		st := "fg"
 		switch {
 		case strings.HasPrefix(word, "due:") && hasDue:
@@ -302,6 +304,8 @@ func (m Model) taskRow(t *todo.Task, hide map[string]bool, now time.Time) TaskRo
 			continue
 		case t.Done:
 			st = "done"
+		case braced[i]:
+			st = "highlight"
 		case len(word) > 1 && word[0] == '+':
 			st = "project"
 		case len(word) > 1 && word[0] == '@':

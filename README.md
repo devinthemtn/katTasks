@@ -506,8 +506,8 @@ cursor_bg = { light = "#eeeeee", dark = "#333344" }   # differs on light / dark 
 
 A color is `"#rrggbb"`, an ANSI number from `"0"` to `"255"`, or `""` for the
 terminal's own color. The colors are `fg dim accent border border_focus
-cursor_bg selected_bg match_bg title_fg title_bg project context tag pri_a
-pri_b pri_c pri_d pri_other due today overdue done ok error`. A theme file with
+cursor_bg selected_bg match_bg title_fg title_bg project context tag highlight
+pri_a pri_b pri_c pri_d pri_other due today overdue done ok error`. A theme file with
 a mistake is skipped, with a warning in the footer.
 
 ## Command line

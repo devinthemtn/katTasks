@@ -1,6 +1,8 @@
 package listview
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/devinthemtn/katTasks/internal/query"
@@ -165,6 +167,26 @@ func TestAlarmLabel(t *testing.T) { // now is Wednesday 2026-11-18 10:00
 	} {
 		if l, p := AlarmLabel(todo.Parse(c.line), now); l != c.label || p != c.past {
 			t.Errorf("AlarmLabel(%q) = %q %v, want %q %v", c.line, l, p, c.label, c.past)
+		}
+	}
+}
+
+func TestBraced(t *testing.T) {
+	for _, c := range []struct {
+		text string
+		want []bool
+	}{
+		{"call {{Ann}} today", []bool{false, true, false}},
+		{"ask {{Ann and Bo}} +Work", []bool{false, true, true, true, false}},
+		{"x{{y}}z and {{w}}", []bool{true, false, true}},
+		{"{{a}} {{b", []bool{true, false}},
+		{"open {{ never closed", []bool{false, false, false, false}},
+		{"{{}} }} {{a}}{{b}}", []bool{true, false, true}},
+		{"no braces", []bool{false, false}},
+	} {
+		got := Braced(strings.Fields(c.text))
+		if fmt.Sprint(got) != fmt.Sprint(c.want) {
+			t.Errorf("Braced(%q) = %v, want %v", c.text, got, c.want)
 		}
 	}
 }

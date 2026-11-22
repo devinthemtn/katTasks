@@ -337,12 +337,14 @@ func (m Model) taskBadges(t *todo.Task, now time.Time, on func(lipgloss.Style) l
 }
 
 // taskWords is the task's text with its words colored: projects, contexts,
-// tags and search matches. Tags shown as badges, and hidden ones, are left
+// tags, {{highlights}} and search matches. Tags shown as badges, and hidden ones, are left
 // out.
 func (m Model) taskWords(t *todo.Task, r row, on func(lipgloss.Style) lipgloss.Style) string {
 	_, hasDue := t.Due()
 	var parts []string
-	for _, word := range strings.Fields(t.Text) {
+	words := strings.Fields(t.Text)
+	braced := listview.Braced(words)
+	for i, word := range words {
 		st := m.st.text
 		switch {
 		case strings.HasPrefix(word, "due:") && hasDue:
@@ -351,6 +353,8 @@ func (m Model) taskWords(t *todo.Task, r row, on func(lipgloss.Style) lipgloss.S
 			continue
 		case t.Done:
 			st = m.st.done
+		case braced[i]:
+			st = m.st.highlight
 		case len(word) > 1 && word[0] == '+':
 			st = m.st.project
 		case len(word) > 1 && word[0] == '@':

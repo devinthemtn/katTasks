@@ -395,3 +395,32 @@ func AlarmLabel(t *todo.Task, now time.Time) (label string, past bool) {
 	}
 	return "⏰ " + label, a.Before(now)
 }
+
+// Braced reports which words are part of a {{ … }} span, which may cover
+// several words. A word counts if any of it is inside the braces, braces
+// included. A {{ that is never closed marks nothing.
+func Braced(words []string) []bool {
+	out := make([]bool, len(words))
+	open := -1
+	for i, w := range words {
+		for {
+			if open < 0 {
+				j := strings.Index(w, "{{")
+				if j < 0 {
+					break
+				}
+				open, w = i, w[j+2:]
+				continue
+			}
+			j := strings.Index(w, "}}")
+			if j < 0 {
+				break
+			}
+			for k := open; k <= i; k++ {
+				out[k] = true
+			}
+			open, w = -1, w[j+2:]
+		}
+	}
+	return out
+}

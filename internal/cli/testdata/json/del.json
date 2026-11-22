@@ -1,0 +1,15 @@
+{
+  "action": "del",
+  "tasks": [
+    {
+      "n": 5,
+      "raw": "plain task",
+      "done": false,
+      "text": "plain task",
+      "projects": [],
+      "contexts": [],
+      "tags": {}
+    }
+  ],
+  "message": "5 deleted."
+}

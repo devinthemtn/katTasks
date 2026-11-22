@@ -1,0 +1,22 @@
+{
+  "action": "add",
+  "tasks": [
+    {
+      "n": 6,
+      "raw": "(C) 2026-11-18 New thing +Work due:2026-11-20",
+      "done": false,
+      "priority": "C",
+      "created": "2026-11-18",
+      "text": "New thing +Work due:2026-11-20",
+      "projects": [
+        "+Work"
+      ],
+      "contexts": [],
+      "tags": {
+        "due": "2026-11-20"
+      },
+      "due": "2026-11-20"
+    }
+  ],
+  "message": "6 added."
+}

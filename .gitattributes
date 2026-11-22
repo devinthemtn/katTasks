@@ -1,3 +1,6 @@
 # Embedded into the binary: keep LF on every checkout, so a build on
 # Windows writes the same settings file as one on Linux or macOS.
 internal/config/default.toml text eol=lf
+
+# Golden files compared byte for byte with the -json output.
+internal/cli/testdata/** text eol=lf

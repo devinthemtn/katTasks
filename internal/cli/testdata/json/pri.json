@@ -1,0 +1,16 @@
+{
+  "action": "pri",
+  "tasks": [
+    {
+      "n": 5,
+      "raw": "(A) plain task",
+      "done": false,
+      "priority": "A",
+      "text": "plain task",
+      "projects": [],
+      "contexts": [],
+      "tags": {}
+    }
+  ],
+  "message": "5 prioritized (A)."
+}

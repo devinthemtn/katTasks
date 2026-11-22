@@ -1,0 +1,21 @@
+{
+  "action": "archive",
+  "tasks": [
+    {
+      "n": 4,
+      "raw": "x 2026-11-17 2026-11-02 Pay rent +Home pri:A",
+      "done": true,
+      "created": "2026-11-02",
+      "completed": "2026-11-17",
+      "text": "Pay rent +Home pri:A",
+      "projects": [
+        "+Home"
+      ],
+      "contexts": [],
+      "tags": {
+        "pri": "A"
+      }
+    }
+  ],
+  "message": "1 task(s) archived to $DIR/done.txt."
+}

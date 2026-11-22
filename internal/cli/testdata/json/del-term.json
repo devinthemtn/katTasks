@@ -1,0 +1,26 @@
+{
+  "action": "del",
+  "tasks": [
+    {
+      "n": 1,
+      "raw": "(A) 2026-11-01 Call Mom +Family @phone due:2026-11-20 at:1430",
+      "done": false,
+      "priority": "A",
+      "created": "2026-11-01",
+      "text": "Call Mom +Family @phone due:2026-11-20 at:1430",
+      "projects": [
+        "+Family"
+      ],
+      "contexts": [
+        "@phone"
+      ],
+      "tags": {
+        "at": "1430",
+        "due": "2026-11-20"
+      },
+      "due": "2026-11-20",
+      "at": "14:30"
+    }
+  ],
+  "message": "Removed 'uid:7' from task."
+}

@@ -596,8 +596,8 @@ first, on Linux (x86-64 and ARM64), Windows (x86-64 and ARM64) and macOS (one
 universal `.app`), and its `katTasks-gui_…` archives go in the same release,
 with the Windows installer (`katTasks-<version>-windows-amd64-setup.exe`):
 
-    git tag -a v0.3.0 -m "katTasks 0.3.0"
-    git push origin v0.3.0
+    git tag -a v1.0.0 -m "katTasks 1.0.0"
+    git push origin v1.0.0
 
 The tag is the version: `katTasks -version` reports it, and there is nothing to
 bump in the code. Edit the generated notes on GitHub afterwards if you like. To

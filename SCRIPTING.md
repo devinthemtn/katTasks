@@ -99,13 +99,13 @@ Every script gets a global table called `kat`.
 
 | Field | Example |
 |---|---|
-| `line` | `"(A) 2026-11-20 Call mom +family due:2026-11-22"`: the full todo.txt line |
-| `text` | `"Call mom +family due:2026-11-22"`: the line without the done mark, priority or dates |
+| `line` | `"(A) 2026-11-20 Call mom +family @phone due:2026-11-22 id:7"`: the full todo.txt line |
+| `text` | `"Call mom +family @phone due:2026-11-22 id:7"`: the line without the done mark, priority or dates |
 | `done` | `false` |
 | `priority` | `"A"`, or `nil` |
 | `due` | `"2026-11-22"`, or `nil` |
-| `projects` | `{ "family" }` |
-| `contexts` | `{ "phone" }` |
+| `projects` | `{ "+family" }`, with the `+` |
+| `contexts` | `{ "@phone" }`, with the `@` |
 | `tags` | `{ due = "2026-11-22", id = "7" }`: every `key:value` |
 
 These tables are copies. Changing them changes nothing in todo.txt. To
@@ -222,7 +222,7 @@ return p   -- nil just removes the /word
 local seen, list = {}, {}
 for _, t in ipairs(kat.tasks()) do
   for _, p in ipairs(t.projects) do
-    if not seen[p] then seen[p] = true; table.insert(list, "+" .. p) end
+    if not seen[p] then seen[p] = true; table.insert(list, p) end
   end
 end
 table.sort(list)

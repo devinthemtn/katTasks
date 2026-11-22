@@ -87,7 +87,7 @@ jobs:
           task build VERSION=${{ steps.version.outputs.version }}
           d=${{ steps.version.outputs.name }}
           mkdir -p ../gui-dist "$d"
-          cp bin/katTasks-gui build/linux/katTasks-gui.desktop build/appicon.png ../README.md "$d"/
+          cp bin/katTasks-gui build/linux/katTasks-gui.desktop build/appicon.png ../README.md ../LICENSE "$d"/
           tar czf ../gui-dist/"$d".tar.gz "$d"
 
       - name: Build (Windows)
@@ -96,7 +96,7 @@ jobs:
           task windows:build ARCH=${{ matrix.arch }} VERSION=${{ steps.version.outputs.version }}
           d=${{ steps.version.outputs.name }}
           mkdir -p ../gui-dist "$d"
-          cp bin/katTasks-gui.exe ../README.md "$d"/
+          cp bin/katTasks-gui.exe ../README.md ../LICENSE "$d"/
           zip -r ../gui-dist/"$d".zip "$d"
 
       # The setup exe most Windows users want: both katTasks-gui.exe and

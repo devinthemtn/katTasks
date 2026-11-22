@@ -1,13 +1,13 @@
 # katTasks settings.
 #
 # Every setting is optional; anything left out uses the value shown here.
-# Press Ctrl-r in katTasks to apply changes. Run katTasks -updateconfig after
+# Press Ctrl-r in katTasks to apply changes. Run katTasks -update-config after
 # upgrading to add new settings to this file as comments.
 
 # Color theme: a built-in ("default", "terminal", "nord", "gruvbox",
 # "dracula") or the name of a file in the themes/ folder next to this file
 # (without .toml).
-# Press T in katTasks to pick one; katTasks -maketheme NAME writes a copy of
+# Press T in katTasks to pick one; katTasks -make-theme NAME writes a copy of
 # the current theme to edit.
 theme = "default"
 

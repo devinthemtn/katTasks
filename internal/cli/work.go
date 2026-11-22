@@ -166,11 +166,12 @@ func (c *ctx) target(args []string, read func([]string) (int, bool)) (t *todo.Ta
 	return t, len(c.tasks), args[:used], true, nil
 }
 
-// cmdAt sets the time of an alert: at 3 9:30, at 3 3pm, at 3 none, or
-// at 3 +5m, which alerts in 5 minutes: it sets due: to that day and the
-// at: time alerts.lead later, as an alert goes off lead before it.
+// cmdAlert sets the time of an alert: alert 3 9:30, alert 3 3pm,
+// alert 3 none, or alert 3 +5m, which alerts in 5 minutes: it sets due:
+// to that day and the at: time alerts.lead later, as an alert goes off
+// lead before it.
 // alert +5m Check the oven adds a task to do it.
-func cmdAt(c *ctx, args []string) error {
+func cmdAlert(c *ctx, args []string) error {
 	if len(args) < 2 {
 		return c.bad("need a task number (or text) and a time")
 	}

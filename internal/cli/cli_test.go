@@ -154,7 +154,7 @@ func TestJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(out), &tasks); err != nil {
 		t.Fatalf("%v\n%s", err, out)
 	}
-	want := Task{N: 1, Raw: "(A) 2026-11-01 Call Mom +Family @phone due:2026-11-20 uid:7", Priority: "A", Created: "2026-11-01",
+	want := Task{N: 1, Line: "(A) 2026-11-01 Call Mom +Family @phone due:2026-11-20 uid:7", Priority: "A", Created: "2026-11-01",
 		Text: "Call Mom +Family @phone due:2026-11-20 uid:7", Projects: []string{"+Family"}, Contexts: []string{"@phone"},
 		Tags: map[string]string{"due": "2026-11-20", "uid": "7"}, Due: "2026-11-20"}
 	got, _ := json.Marshal(tasks)

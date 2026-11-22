@@ -15,8 +15,8 @@ import (
 
 // Task is the JSON form of a task.
 type Task struct {
-	N         int               `json:"n"` // 0 for tasks in the done file
-	Raw       string            `json:"raw"`
+	N         int               `json:"n"`    // 0 for tasks in the done file
+	Line      string            `json:"line"` // the whole todo.txt line
 	Done      bool              `json:"done"`
 	Priority  string            `json:"priority,omitempty"`
 	Created   string            `json:"created,omitempty"`
@@ -33,7 +33,7 @@ type Task struct {
 }
 
 func toJSON(n int, t *todo.Task) Task {
-	j := Task{N: n, Raw: t.String(), Done: t.Done, Text: t.Text,
+	j := Task{N: n, Line: t.String(), Done: t.Done, Text: t.Text,
 		Projects: nonNil(t.Projects()), Contexts: nonNil(t.Contexts()), Tags: map[string]string{}}
 	if t.Priority != 0 {
 		j.Priority = string(t.Priority)

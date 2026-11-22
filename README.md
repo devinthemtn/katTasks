@@ -108,9 +108,9 @@ It also starts the background reminder and sets it to start at sign-in.
 |---|---|
 | `-file PATH` | open this todo.txt instead of `files.todo` |
 | `-config PATH` | use another settings file |
-| `-makeconfig` | write the settings file with every default, then exit (never overwrites) |
-| `-updateconfig` | add settings your file is missing, for example ones new in this version, as commented-out lines with their explanations, then exit. Your own settings and comments are left alone |
-| `-maketheme NAME` | write the current theme to `themes/NAME.toml` to edit, then exit |
+| `-make-config` | write the settings file with every default, then exit (never overwrites) |
+| `-update-config` | add settings your file is missing, for example ones new in this version, as commented-out lines with their explanations, then exit. Your own settings and comments are left alone |
+| `-make-theme NAME` | write the current theme to `themes/NAME.toml` to edit, then exit |
 | `-paths` | print the settings file, todo.txt and done.txt in use, then exit |
 | `-json`, `-f` | for commands: print JSON; delete without asking |
 | `-version`, `-h` | print the version / help, which ends with examples and the settings path. `katTasks help` does the same. It's in color in a terminal (`NO_COLOR=1` turns that off) and plain when piped, so `katTasks -h \| less` works |
@@ -337,7 +337,7 @@ sound_file = ""    # e.g. "~/sounds/bell.wav"; empty = the system's notification
 
 From the command line, `katTasks alert +5m Check the oven` adds a task that
 alerts in 5 minutes (it sets `due:` to that day and the `at:` time `lead`
-later), `katTasks at 3 930` gives task 3 a time, and `katTasks alerts` lists
+later), `katTasks alert 3 930` gives task 3 a time, and `katTasks alerts` lists
 what's coming up in the next week.
 
 katTasks and katTasks-gui alert while they're open. For alerts when neither
@@ -494,7 +494,7 @@ which uses only your terminal's 16 colors; `nord`; `gruvbox`; and
 [`dracula`](https://draculatheme.com). Press `T` to pick one. The choice is saved to `theme` in config.toml.
 
 Any `themes/NAME.toml` next to config.toml adds a theme called `NAME`. If it
-has the same name as a built-in, it replaces it. `katTasks -maketheme NAME`
+has the same name as a built-in, it replaces it. `katTasks -make-theme NAME`
 writes the current theme there with every color explained. A theme only needs
 the colors it changes; the rest come from `base`:
 
@@ -532,7 +532,7 @@ the task list to see the numbers. Several numbers can be given as `do 2 5` or
 | `start N…` / `stop N…` | set / clear `status:doing` |
 | `status N WORD` | any status, e.g. `blocked`; `none` clears it |
 | `progress N PERCENT` (`prog`) | `40`, `+10`, `-10`; `none` clears it |
-| `at N TIME` (`alert`) | time of day for the agenda and alerts: `930`, `14:30`, `3pm`; `+5m` or `in 2h` alerts that long from now, once; `none` clears it |
+| `alert N TIME` (`at`) | time of day for the agenda and alerts: `930`, `14:30`, `3pm`; `+5m` or `in 2h` alerts that long from now, once; `none` clears it |
 | `alarm N [DATE] TIME` | an alarm: `+5m`, `in 1h30m`, `tomorrow 6:30`, `fri 7am`, `2026-12-01 0730`, or just `18:00` (the next one); `none` clears it |
 | `alert WHEN TEXT…`, `alarm WHEN TEXT…` | add a task with that alert or alarm: `katTasks alarm +5m Tea is ready` |
 | `alerts [DAYS]` (`upcoming`) | the alerts and alarms of the next DAYS days (7), soonest first |
@@ -550,7 +550,7 @@ $ katTasks -f del 4
 ```
 
 With `-json`, lists print an array of tasks
-(`n raw done priority created completed text projects contexts tags due at
+(`n line done priority created completed text projects contexts tags due at
 alarm status progress`); `alerts` prints `{kind, at, fires, task}`.
 Changes print `{action, tasks, added, message}`.
 
@@ -604,3 +604,7 @@ bump in the code. Edit the generated notes on GitHub afterwards if you like. To
 try the build without publishing, run the workflow by hand (Actions → release
 → Run workflow); the archives are attached to the run. Locally:
 `go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean`.
+
+## License
+
+MIT; see [LICENSE](LICENSE).

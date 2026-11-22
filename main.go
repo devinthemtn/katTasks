@@ -37,9 +37,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.SetOutput(stderr)
 	cfgPath := fs.String("config", config.DefaultPath(), "settings file")
 	todoFile := fs.String("file", "", "todo.txt to open (overrides files.todo)")
-	makeConfig := fs.Bool("makeconfig", false, "create the settings file with every default, then exit")
-	updateConfig := fs.Bool("updateconfig", false, "add settings missing from the settings file (e.g. new in this version) as comments, then exit")
-	makeTheme := fs.String("maketheme", "", "write the current theme to themes/`NAME`.toml next to the settings, to edit; then exit")
+	makeConfig := fs.Bool("make-config", false, "create the settings file with every default, then exit")
+	updateConfig := fs.Bool("update-config", false, "add settings missing from the settings file (e.g. new in this version) as comments, then exit")
+	makeTheme := fs.String("make-theme", "", "write the current theme to themes/`NAME`.toml next to the settings, to edit; then exit")
+	// The spellings before 1.0 still work, but help doesn't list them.
+	fs.BoolVar(makeConfig, "makeconfig", false, "")
+	fs.BoolVar(updateConfig, "updateconfig", false, "")
+	fs.StringVar(makeTheme, "maketheme", "", "")
 	showVersion := fs.Bool("version", false, "print the version, then exit")
 	showPaths := fs.Bool("paths", false, "print the settings file, todo.txt and done.txt in use, then exit")
 	asJSON := fs.Bool("json", false, "commands print JSON")
@@ -73,7 +77,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		if created {
 			fmt.Fprintln(stdout, "created", *cfgPath)
 		} else {
-			fmt.Fprintln(stdout, *cfgPath, "already exists; left unchanged (try -updateconfig)")
+			fmt.Fprintln(stdout, *cfgPath, "already exists; left unchanged (try -update-config)")
 		}
 		return 0
 	case *makeTheme != "":

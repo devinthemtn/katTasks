@@ -3,7 +3,7 @@
   "tasks": [
     {
       "n": 3,
-      "raw": "x 2026-11-18 2026-11-10 Water plants @home rec:+1w due:2026-11-18",
+      "line": "x 2026-11-18 2026-11-10 Water plants @home rec:+1w due:2026-11-18",
       "done": true,
       "created": "2026-11-10",
       "completed": "2026-11-18",
@@ -22,7 +22,7 @@
   "added": [
     {
       "n": 4,
-      "raw": "2026-11-18 Water plants @home rec:+1w due:2026-11-25",
+      "line": "2026-11-18 Water plants @home rec:+1w due:2026-11-25",
       "done": false,
       "created": "2026-11-18",
       "text": "Water plants @home rec:+1w due:2026-11-25",

@@ -3,7 +3,7 @@
   "tasks": [
     {
       "n": 5,
-      "raw": "plain task",
+      "line": "plain task",
       "done": false,
       "text": "plain task",
       "projects": [],

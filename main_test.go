@@ -29,6 +29,9 @@ func TestVersionAndHelp(t *testing.T) {
 		if code != 0 || !strings.Contains(out, "Usage") || errOut != "" {
 			t.Errorf("%v: code %d, stdout %d bytes, stderr %q; want the help on stdout", args, code, len(out), errOut)
 		}
+		if !strings.Contains(out, "-make-config") || strings.Contains(out, "-makeconfig") {
+			t.Errorf("%v: help should list -make-config and not the old -makeconfig:\n%s", args, out)
+		}
 	}
 }
 
@@ -81,26 +84,26 @@ func TestCommands(t *testing.T) {
 func TestMakeAndUpdateConfig(t *testing.T) {
 	dir := t.TempDir()
 	cfg := filepath.Join(dir, "config.toml")
-	if code, out, _ := katTasks(t, dir, "", "-makeconfig"); code != 0 || out != "created "+cfg+"\n" {
-		t.Errorf("-makeconfig: %d %q", code, out)
+	if code, out, _ := katTasks(t, dir, "", "-make-config"); code != 0 || out != "created "+cfg+"\n" {
+		t.Errorf("-make-config: %d %q", code, out)
 	}
 	if code, out, _ := katTasks(t, dir, "", "-makeconfig"); code != 0 || !strings.Contains(out, "already exists") {
-		t.Errorf("second -makeconfig: %d %q", code, out)
+		t.Errorf("second -makeconfig (the old spelling): %d %q", code, out)
 	}
-	if code, out, _ := katTasks(t, dir, "", "-updateconfig"); code != 0 || !strings.Contains(out, "already has every setting") {
-		t.Errorf("-updateconfig on a full file: %d %q", code, out)
+	if code, out, _ := katTasks(t, dir, "", "-update-config"); code != 0 || !strings.Contains(out, "already has every setting") {
+		t.Errorf("-update-config on a full file: %d %q", code, out)
 	}
 	os.WriteFile(cfg, []byte("theme = \"default\"\n"), 0o644)
 	if code, out, _ := katTasks(t, dir, "", "-updateconfig"); code != 0 || !strings.Contains(out, "as comments") {
-		t.Errorf("-updateconfig on a short file: %d %q", code, out)
+		t.Errorf("-updateconfig (the old spelling) on a short file: %d %q", code, out)
 	}
 }
 
 func TestMakeTheme(t *testing.T) {
 	dir := t.TempDir()
-	code, out, errOut := katTasks(t, dir, "", "-maketheme", "mine")
+	code, out, errOut := katTasks(t, dir, "", "-make-theme", "mine")
 	if code != 0 || !strings.Contains(out, "mine") {
-		t.Fatalf("-maketheme: %d %q %q", code, out, errOut)
+		t.Fatalf("-make-theme: %d %q %q", code, out, errOut)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "themes", "mine.toml")); err != nil {
 		t.Error(err)

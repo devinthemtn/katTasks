@@ -43,7 +43,7 @@ var commands = []command{
 	{[]string{"stop"}, "stop N...", cmdStop},
 	{[]string{"status"}, "status N WORD|none", cmdStatus},
 	{[]string{"progress", "prog"}, "progress N PERCENT|none", cmdProgress},
-	{[]string{"at", "alert"}, "at N WHEN|none", cmdAt},
+	{[]string{"alert", "at"}, "alert N WHEN|none", cmdAlert},
 	{[]string{"alarm"}, "alarm N WHEN|none", cmdAlarm},
 	{[]string{"alerts", "upcoming"}, "alerts [DAYS]", cmdAlerts},
 	{[]string{"archive"}, "archive", cmdArchive},

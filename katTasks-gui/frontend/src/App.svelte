@@ -283,7 +283,7 @@
             {/each}
             <div class="line">&nbsp;</div>
             <div class="line dim">j/k preview · enter save · esc cancel</div>
-            <div class="line dim">katTasks -maketheme NAME copies the current theme to edit</div>
+            <div class="line dim">katTasks -make-theme NAME copies the current theme to edit</div>
           </div>
         {:else if s.help}
           <div class="pad scroll" bind:this={helpEl} onclick={() => key('esc')} role="button" tabindex="-1">

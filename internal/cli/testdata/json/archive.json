@@ -3,7 +3,7 @@
   "tasks": [
     {
       "n": 4,
-      "raw": "x 2026-11-17 2026-11-02 Pay rent +Home pri:A",
+      "line": "x 2026-11-17 2026-11-02 Pay rent +Home pri:A",
       "done": true,
       "created": "2026-11-02",
       "completed": "2026-11-17",

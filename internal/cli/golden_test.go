@@ -53,6 +53,7 @@ func TestJSONGolden(t *testing.T) {
 		{"pri", []string{"pri", "5", "a"}},
 		{"start", []string{"start", "1"}},
 		{"progress", []string{"progress", "2", "75"}},
+		{"alert", []string{"alert", "5", "930"}},
 		{"archive", []string{"archive"}},
 	}
 	for _, tc := range cases {

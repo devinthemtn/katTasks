@@ -3,7 +3,7 @@
   "tasks": [
     {
       "n": 6,
-      "raw": "(C) 2026-11-18 New thing +Work due:2026-11-20",
+      "line": "(C) 2026-11-18 New thing +Work due:2026-11-20",
       "done": false,
       "priority": "C",
       "created": "2026-11-18",

@@ -26,7 +26,7 @@ var examples = [][2]string{
 	{"katTasks alert +5m Check the oven", "a new task with a popup in 5 minutes"},
 	{"katTasks alarm +5m Tea is ready", "a new task that rings like an alarm in 5 minutes"},
 	{"katTasks alarm 3 tomorrow 6:30", "an alarm on task 3"},
-	{"katTasks at 3 930", "task 3 at 9:30: the agenda, and an alert each day"},
+	{"katTasks alert 3 930", "task 3 at 9:30: the agenda, and an alert each day"},
 	{"katTasks alerts", "the alerts and alarms coming up this week"},
 	{"katTasks remind -install", "send alerts and alarms with katTasks closed"},
 	{"katTasks -json ls pri:A | jq '.[].text'", "JSON for scripts"},
@@ -48,6 +48,10 @@ func newHelpStyles(w io.Writer) helpStyles {
 }
 
 // printUsage writes katTasks -h to fs's output.
+// oldFlags are spellings from before 1.0. They still work, but help
+// lists only the new ones.
+var oldFlags = map[string]bool{"makeconfig": true, "updateconfig": true, "maketheme": true}
+
 func printUsage(fs *flag.FlagSet, cfgPath string) {
 	w := fs.Output()
 	st := newHelpStyles(w)
@@ -59,9 +63,15 @@ func printUsage(fs *flag.FlagSet, cfgPath string) {
 
 	head("Flags (before the command)")
 	var flags bytes.Buffer
-	fs.SetOutput(&flags)
-	fs.PrintDefaults()
-	fs.SetOutput(w)
+	shown := flag.NewFlagSet(fs.Name(), flag.ContinueOnError)
+	fs.VisitAll(func(f *flag.Flag) {
+		if !oldFlags[f.Name] {
+			shown.Var(f.Value, f.Name, f.Usage)
+			shown.Lookup(f.Name).DefValue = f.DefValue // not what's been parsed
+		}
+	})
+	shown.SetOutput(&flags)
+	shown.PrintDefaults()
 	for _, line := range strings.Split(strings.TrimRight(flags.String(), "\n"), "\n") {
 		if name, rest, ok := strings.Cut(strings.TrimPrefix(line, "  "), " "); ok && strings.HasPrefix(line, "  -") {
 			fmt.Fprintln(w, "  "+st.flag.Render(name)+" "+rest)

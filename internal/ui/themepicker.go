@@ -76,6 +76,6 @@ func (m Model) viewThemePicker() string {
 	}
 	lines = append(lines, "",
 		m.st.faint.Render("j/k preview · enter save · esc cancel"),
-		m.st.faint.Render("katTasks -maketheme NAME copies the current theme to edit"))
+		m.st.faint.Render("katTasks -make-theme NAME copies the current theme to edit"))
 	return strings.Join(lines, "\n")
 }

@@ -3,7 +3,7 @@
   "tasks": [
     {
       "n": 5,
-      "raw": "(A) plain task",
+      "line": "(A) plain task",
       "done": false,
       "priority": "A",
       "text": "plain task",

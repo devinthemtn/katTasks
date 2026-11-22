@@ -28,6 +28,8 @@ archives:
     wrap_in_directory: true
     files:
       - README.md
+      - SCRIPTING.md
+      - LICENSE
 
 checksum:
   name_template: checksums.txt

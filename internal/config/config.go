@@ -1,7 +1,7 @@
 // Package config loads katTasks settings from a commented TOML file, in the
 // same style as katdown: the embedded default.toml is the single source of
 // defaults, bad values fall back to their default and are reported, and
-// -updateconfig adds settings a file is missing as comments.
+// -update-config adds settings a file is missing as comments.
 package config
 
 import (

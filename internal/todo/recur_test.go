@@ -110,3 +110,22 @@ func TestHugeBusinessRecurrence(t *testing.T) {
 		t.Fatal("rec:999999999b took over 2s")
 	}
 }
+
+// The finished task keeps its katnotes link; the next occurrence is new.
+func TestNextDropsKatnotesLink(t *testing.T) {
+	now := time.Date(2026, 11, 23, 9, 0, 0, 0, time.Local)
+	task := Parse("water plants @home rec:1w kn:9baef8 note:page/garden")
+	n, ok := task.Next(now)
+	if !ok {
+		t.Fatal("no next")
+	}
+	if _, has := n.Tag("kn"); has {
+		t.Errorf("next keeps kn: %q", n)
+	}
+	if _, has := n.Tag("note"); has {
+		t.Errorf("next keeps note: %q", n)
+	}
+	if v, _ := task.Tag("kn"); v != "9baef8" {
+		t.Errorf("original changed: %q", task)
+	}
+}

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -53,8 +54,10 @@ func katnotesErr(prog, setting string, out []byte, err error) error {
 	if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("%s not found: set [katnotes] %s in the settings", prog, setting)
 	}
-	if msg := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(string(out)), "Error:")); msg != "" {
-		return fmt.Errorf("%s: %s", prog, lastLine(msg))
+	if msg := lastLine(strings.TrimSpace(string(out))); msg != "" {
+		// katnotes already says "katnotes: …"; don't say it twice.
+		msg = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(msg, filepath.Base(prog)+":"), "Error:"))
+		return fmt.Errorf("%s: %s", filepath.Base(prog), msg)
 	}
 	return fmt.Errorf("%s: %v", prog, err)
 }

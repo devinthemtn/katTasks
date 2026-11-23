@@ -124,6 +124,8 @@ func (t *Task) threshold() (time.Time, bool) {
 //   - A t: threshold date keeps the same distance from the due date; if there
 //     is no due date it is advanced the same way a due date would be.
 //   - The new task gets today as its creation date if the original had one.
+//   - A katnotes link (kn:, note:) stays on the finished task, which is the
+//     one its note's task stands for; the new occurrence starts unlinked.
 func (t *Task) Next(now time.Time) (*Task, bool) {
 	r, ok := t.Recurrence()
 	if !ok {
@@ -134,6 +136,8 @@ func (t *Task) Next(now time.Time) (*Task, bool) {
 	n.Done, n.Completed = false, time.Time{}
 	n.RemoveTag("status") // a fresh occurrence isn't started
 	n.RemoveTag("progress")
+	n.RemoveTag("kn")
+	n.RemoveTag("note")
 	if !t.Created.IsZero() {
 		n.Created = today
 	}

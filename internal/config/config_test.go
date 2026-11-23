@@ -274,3 +274,23 @@ func TestUpdateFile(t *testing.T) {
 		t.Errorf("missing file: created %v, %v", created, err)
 	}
 }
+
+// [katnotes] programs: bare names stay for $PATH, paths are expanded.
+func TestKatnotesPrograms(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	cases := map[string]string{
+		"":             "katnotes",
+		"  katnotes  ": "katnotes",
+		"kn":           "kn",
+		"~/bin/kn":     filepath.Join(home, "bin/kn"),
+		"/opt/kn/kn":   "/opt/kn/kn",
+	}
+	for in, want := range cases {
+		if got := program(in, "katnotes"); got != want {
+			t.Errorf("program(%q) = %q, want %q", in, got, want)
+		}
+	}
+	if got := program("./kn", "katnotes"); !filepath.IsAbs(got) {
+		t.Errorf("./kn = %q, want an absolute path", got)
+	}
+}

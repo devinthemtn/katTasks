@@ -230,16 +230,8 @@ func (c *Config) normalize() []error {
 		bad("gui.font_family", fmt.Sprintf("%q", c.GUI.FontFamily), "want font names separated by commas")
 		c.GUI.FontFamily = ""
 	}
-	if c.Katnotes.Command = strings.TrimSpace(c.Katnotes.Command); c.Katnotes.Command == "" {
-		c.Katnotes.Command = "katnotes"
-	} else {
-		c.Katnotes.Command = Expand(c.Katnotes.Command)
-	}
-	if c.Katnotes.GUICommand = strings.TrimSpace(c.Katnotes.GUICommand); c.Katnotes.GUICommand == "" {
-		c.Katnotes.GUICommand = "katnotes-gui"
-	} else {
-		c.Katnotes.GUICommand = Expand(c.Katnotes.GUICommand)
-	}
+	c.Katnotes.Command = program(c.Katnotes.Command, "katnotes")
+	c.Katnotes.GUICommand = program(c.Katnotes.GUICommand, "katnotes-gui")
 	if c.GUI.FontSize < MinFontSize || c.GUI.FontSize > MaxFontSize {
 		bad("gui.font_size", c.GUI.FontSize, fmt.Sprintf("want %d to %d", MinFontSize, MaxFontSize))
 		c.GUI.FontSize = DefaultFontSize
@@ -312,6 +304,20 @@ func Expand(p string) string {
 		return abs
 	}
 	return p
+}
+
+// program is a [katnotes] program setting: a bare name such as "katnotes"
+// stays as it is, to be looked up on $PATH; anything with a folder in it
+// ("~/bin/katnotes", "./katnotes") is expanded like a file path. Empty is def.
+func program(v, def string) string {
+	v = strings.TrimSpace(os.ExpandEnv(v))
+	switch {
+	case v == "":
+		return def
+	case v == "~" || strings.HasPrefix(v, "~/") || strings.ContainsAny(v, `/\`):
+		return Expand(v)
+	}
+	return v
 }
 
 // Make writes DefaultSettingsFile to path unless it already exists.

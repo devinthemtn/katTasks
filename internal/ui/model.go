@@ -94,23 +94,26 @@ type Model struct {
 	statusErr  bool
 	configWarn string // settings problems, shown until fixed and reloaded
 
-	st         styles
-	themes     []theme.Theme
-	theme      string          // name of the theme in use
-	pickIdx    int             // theme picker cursor
-	pickPrev   string          // theme to restore if the picker is cancelled
-	scripts    []script.Script // Lua scripts in the scripts folder
-	palItems   []paletteItem
-	palShown   []int // indexes into palItems that match the query, best first
-	palIdx     int
-	km         keymap
-	pending    string // first key of a chord, waiting for the second
-	chordSeq   int
-	showHelp   bool
-	helpScroll int       // the help screen's first line, when it doesn't all fit
-	calendar   bool      // the calendar is shown instead of the task list
-	agenda     bool      // the list shows one week, by day (see agenda.go)
-	calDay     time.Time // the day chosen in the calendar
+	st       styles
+	themes   []theme.Theme
+	theme    string          // name of the theme in use
+	pickIdx  int             // theme picker cursor
+	pickPrev string          // theme to restore if the picker is cancelled
+	scripts  []script.Script // Lua scripts in the scripts folder
+	palItems []paletteItem
+	palShown []int // indexes into palItems that match the query, best first
+	palIdx   int
+	// palPrompt and palEmpty replace ": " and "no matching command" when
+	// the palette picks something else, such as add_to_note's note.
+	palPrompt, palEmpty string
+	km                  keymap
+	pending             string // first key of a chord, waiting for the second
+	chordSeq            int
+	showHelp            bool
+	helpScroll          int       // the help screen's first line, when it doesn't all fit
+	calendar            bool      // the calendar is shown instead of the task list
+	agenda              bool      // the list shows one week, by day (see agenda.go)
+	calDay              time.Time // the day chosen in the calendar
 
 	width, height int
 

@@ -396,6 +396,13 @@ export interface Snapshot {
      * matching commands, in palette mode
      */
     "palette": PaletteRow[] | null;
+
+    /**
+     * PalettePrompt and PaletteEmpty are the palette's prompt (": ") and
+     * what it says when nothing matches; add_to_note's note picker changes them.
+     */
+    "palettePrompt": string;
+    "paletteEmpty": string;
     "palIdx": number;
 
     /**
@@ -437,6 +444,13 @@ export interface TaskRow {
     "due": string;
     "dueStyle": string;
     "recur": boolean;
+
+    /**
+     * Linked is the katnotes note (kind/id) a kn: tag links the task to,
+     * for the ⇄ badge; IsLinked is set even when note: is missing.
+     */
+    "linked": string;
+    "isLinked": boolean;
 
     /**
      * Status and Progress are the in-progress badges, e.g. "▶ doing" and

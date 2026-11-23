@@ -8,11 +8,11 @@ import (
 
 // styles are the lipgloss styles for one theme.
 type styles struct {
-	title, faint, text, project, context, tag, highlight, done, header lipgloss.Style
-	err, ok, prompt, helpKey, suggest, suggestOn                       lipgloss.Style
-	pane, paneFocused                                                  lipgloss.Style
-	due, today, overdue                                                lipgloss.Style
-	pri                                                                [5]lipgloss.Style // A, B, C, D, E–Z
+	title, faint, text, project, context, tag, highlight, link, done, header lipgloss.Style
+	err, ok, prompt, helpKey, suggest, suggestOn                             lipgloss.Style
+	pane, paneFocused                                                        lipgloss.Style
+	due, today, overdue                                                      lipgloss.Style
+	pri                                                                      [5]lipgloss.Style // A, B, C, D, E–Z
 
 	cursorBg, selectedBg, matchBg lipgloss.TerminalColor
 }
@@ -39,6 +39,7 @@ func newStyles(t theme.Theme) styles {
 		context:   fg("context"),
 		tag:       fg("tag"),
 		highlight: fg("highlight"),
+		link:      fg("link"),
 		done:      fg("done").Strikethrough(true),
 		header:    fg("dim").Bold(true),
 		err:       fg("error").Bold(true),

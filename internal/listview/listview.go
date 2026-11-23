@@ -29,11 +29,12 @@ const (
 	Project             // one +project
 	Context             // one @context
 	Saved               // a saved search from [filters]
+	Linked              // tasks linked to a katnotes note (kn:)
 )
 
 // String is the kind's name, as the GUI sends it.
 func (k Kind) String() string {
-	return [...]string{"all", "due", "header", "project", "context", "saved"}[k]
+	return [...]string{"all", "due", "header", "project", "context", "saved", "linked"}[k]
 }
 
 // Entry is one row of the sidebar.
@@ -51,6 +52,8 @@ func (e Entry) Label() string {
 		return "All tasks"
 	case Due:
 		return "Has due date"
+	case Linked:
+		return "Linked to notes"
 	}
 	return e.Value
 }
@@ -60,6 +63,9 @@ func (e Entry) Match(t *todo.Task, now time.Time) bool {
 	switch e.Kind {
 	case Due:
 		_, ok := t.Due()
+		return ok
+	case Linked:
+		_, ok := LinkedNote(t)
 		return ok
 	case Project, Context:
 		return t.Has(e.Value)
@@ -75,7 +81,7 @@ func (e Entry) Match(t *todo.Task, now time.Time) bool {
 func Sidebar(tasks []*todo.Task, filters map[string]string, now time.Time) (side []Entry, known []string) {
 	projects, contexts := map[string]int{}, map[string]int{}
 	used := map[string]int{}
-	due, pending := 0, 0
+	due, pending, linked := 0, 0, 0
 	count := func(set map[string]int, w string, done bool) {
 		used[w]++
 		if _, ok := set[w]; !ok {
@@ -100,8 +106,20 @@ func Sidebar(tasks []*todo.Task, filters map[string]string, now time.Time) (side
 			due++
 		}
 	}
+	anyLinked := false
+	for _, t := range tasks {
+		if _, ok := LinkedNote(t); ok {
+			anyLinked = true
+			if !t.Done {
+				linked++
+			}
+		}
+	}
 
 	side = []Entry{{Kind: All, Count: pending}, {Kind: Due, Count: due}}
+	if anyLinked {
+		side = append(side, Entry{Kind: Linked, Count: linked})
+	}
 	if len(filters) > 0 {
 		names := make([]string, 0, len(filters))
 		for n := range filters {
@@ -180,6 +198,8 @@ func CurrentQuery(e Entry, filter string, filters map[string]string) string {
 		q = strings.TrimSpace(e.Value + " " + q)
 	case Due:
 		q = strings.TrimSpace("-due:none " + q)
+	case Linked:
+		q = strings.TrimSpace("kn: " + q)
 	case Saved:
 		q = strings.TrimSpace(filters[e.Value] + " " + q)
 	}
@@ -324,6 +344,36 @@ func DueLabel(d, now time.Time) (string, DueKind) {
 	default:
 		return d.Format("2006-01-02"), DueLater
 	}
+}
+
+// LinkedNote returns the katnotes note (kind/id, from note:) a task is
+// linked to by katnotes: it has a kn:<6 hex digits> tag. A task with kn:
+// but no note: still counts, with an empty note.
+func LinkedNote(t *todo.Task) (string, bool) {
+	id, ok := t.Tag("kn")
+	if !ok || !linkID(id) {
+		return "", false
+	}
+	note, _ := t.Tag("note")
+	return note, true
+}
+
+func linkID(s string) bool {
+	if len(s) != 6 {
+		return false
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// IsLinkTag reports whether a word is a kn: or note: tag, drawn in the
+// theme's link color.
+func IsLinkTag(w string) bool {
+	return (strings.HasPrefix(w, "kn:") || strings.HasPrefix(w, "note:")) && IsTag(w)
 }
 
 // IsTag reports whether a word is a key:value tag (not a URL, and not a

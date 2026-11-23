@@ -85,6 +85,10 @@ type Config struct {
 		RingTime       time.Duration `toml:"-"`
 		DefaultMinutes int           `toml:"-"`
 	} `toml:"alarms"`
+	Katnotes struct {
+		Command    string `toml:"command"`
+		GUICommand string `toml:"gui_command"`
+	} `toml:"katnotes"`
 	RawKeys map[string]any    `toml:"keys"`
 	Filters map[string]string `toml:"filters"`
 
@@ -225,6 +229,16 @@ func (c *Config) normalize() []error {
 	if strings.ContainsAny(c.GUI.FontFamily, ";{}<>\\") {
 		bad("gui.font_family", fmt.Sprintf("%q", c.GUI.FontFamily), "want font names separated by commas")
 		c.GUI.FontFamily = ""
+	}
+	if c.Katnotes.Command = strings.TrimSpace(c.Katnotes.Command); c.Katnotes.Command == "" {
+		c.Katnotes.Command = "katnotes"
+	} else {
+		c.Katnotes.Command = Expand(c.Katnotes.Command)
+	}
+	if c.Katnotes.GUICommand = strings.TrimSpace(c.Katnotes.GUICommand); c.Katnotes.GUICommand == "" {
+		c.Katnotes.GUICommand = "katnotes-gui"
+	} else {
+		c.Katnotes.GUICommand = Expand(c.Katnotes.GUICommand)
 	}
 	if c.GUI.FontSize < MinFontSize || c.GUI.FontSize > MaxFontSize {
 		bad("gui.font_size", c.GUI.FontSize, fmt.Sprintf("want %d to %d", MinFontSize, MaxFontSize))

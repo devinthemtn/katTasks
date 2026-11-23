@@ -21,6 +21,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case editorDoneMsg:
 		m.editorDone(msg)
 		return m, nil
+	case notesListedMsg:
+		m.notesListed(msg)
+		return m, nil
+	case noteLinkedMsg:
+		m.noteLinked(msg)
+		return m, nil
+	case noteOpenedMsg:
+		m.noteOpened(msg)
+		return m, nil
 	case chordTimeoutMsg:
 		return m, m.chordTimedOut(msg)
 	case clipMsg:

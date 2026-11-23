@@ -36,6 +36,7 @@ func (m *Model) openPalette() {
 	m.mode = modePalette
 	m.loadScripts()
 	m.palItems = m.paletteItems()
+	m.palPrompt, m.palEmpty = "", ""
 	m.palIdx = 0
 	m.input.SetValue("")
 	m.input.Focus()
@@ -133,10 +134,10 @@ func (m Model) updatePalette(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) viewPalette(w, h int) string {
-	lines := []string{m.st.prompt.Render(": ") + m.input.View(), ""}
+	lines := []string{m.st.prompt.Render(m.palettePrompt()) + m.input.View(), ""}
 	rows := h - 3
 	if len(m.palShown) == 0 {
-		lines = append(lines, m.st.faint.Render("no matching command"))
+		lines = append(lines, m.st.faint.Render(m.paletteEmpty()))
 		return strings.Join(lines, "\n")
 	}
 	start := 0
@@ -169,6 +170,20 @@ func (m Model) viewPalette(w, h int) string {
 		lines = append(lines, left+strings.Repeat(" ", gap)+keys)
 	}
 	return strings.Join(lines, "\n")
+}
+
+func (m Model) palettePrompt() string {
+	if m.palPrompt != "" {
+		return m.palPrompt
+	}
+	return ": "
+}
+
+func (m Model) paletteEmpty() string {
+	if m.palEmpty != "" {
+		return m.palEmpty
+	}
+	return "no matching command"
 }
 
 func padRight(s string, n int) string {

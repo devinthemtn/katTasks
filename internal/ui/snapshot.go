@@ -47,7 +47,11 @@ type Snapshot struct {
 	Agenda   *Agenda   `json:"agenda"`   // the list as a week, when open
 
 	Palette []PaletteRow `json:"palette"` // matching commands, in palette mode
-	PalIdx  int          `json:"palIdx"`
+	// PalettePrompt and PaletteEmpty are the palette's prompt (": ") and
+	// what it says when nothing matches; add_to_note's note picker changes them.
+	PalettePrompt string `json:"palettePrompt"`
+	PaletteEmpty  string `json:"paletteEmpty"`
+	PalIdx        int    `json:"palIdx"`
 
 	Themes  []ThemeRow `json:"themes"` // in theme mode
 	PickIdx int        `json:"pickIdx"`
@@ -87,6 +91,10 @@ type TaskRow struct {
 	Due      string `json:"due"`
 	DueStyle string `json:"dueStyle"`
 	Recur    bool   `json:"recur"`
+	// Linked is the katnotes note (kind/id) a kn: tag links the task to,
+	// for the ⇄ badge; IsLinked is set even when note: is missing.
+	Linked   string `json:"linked"`
+	IsLinked bool   `json:"isLinked"`
 	// Status and Progress are the in-progress badges, e.g. "▶ doing" and
 	// "▰▰▱▱▱ 40%"; empty for none. Doing makes the status bright.
 	Status   string `json:"status"`
@@ -209,6 +217,7 @@ func (m Model) Snapshot() Snapshot {
 		}
 	}
 	if m.mode == modePalette {
+		s.PalettePrompt, s.PaletteEmpty = m.palettePrompt(), m.paletteEmpty()
 		for _, i := range m.palShown {
 			it := m.palItems[i]
 			s.Palette = append(s.Palette, PaletteRow{Name: it.name, Desc: it.desc, Keys: strings.Join(it.keys, " "), Disabled: it.disabled})
@@ -285,6 +294,7 @@ func (m Model) taskRow(t *todo.Task, hide map[string]bool, now time.Time) TaskRo
 	r.Alarm, r.AlarmPast = listview.AlarmLabel(t, now)
 	_, r.Recur = t.Recurrence()
 	r.Recur = r.Recur && !t.Done
+	r.Linked, r.IsLinked = listview.LinkedNote(t)
 	d, hasDue := t.Due()
 	if hasDue {
 		label, kind := listview.DueLabel(d, now)
@@ -315,6 +325,9 @@ func (m Model) taskRow(t *todo.Task, hide map[string]bool, now time.Time) TaskRo
 				continue
 			}
 			st = "tag"
+			if listview.IsLinkTag(word) {
+				st = "link"
+			}
 		}
 		r.Words = append(r.Words, Word{Text: word, Style: st, Match: !t.Done && m.q.Highlights(word)})
 	}

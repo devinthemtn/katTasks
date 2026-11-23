@@ -324,6 +324,13 @@ func (m Model) taskBadges(t *todo.Task, now time.Time, on func(lipgloss.Style) l
 	if _, ok := t.Recurrence(); ok && !t.Done {
 		badge += on(m.st.context).Render(" ↻")
 	}
+	if _, ok := listview.LinkedNote(t); ok {
+		st := m.st.link
+		if t.Done {
+			st = m.st.faint
+		}
+		badge += on(st).Render(" ⇄")
+	}
 	if d, ok := t.Due(); ok {
 		label, st := m.st.dueLabel(d, now)
 		if t.Done {
@@ -364,6 +371,9 @@ func (m Model) taskWords(t *todo.Task, r row, on func(lipgloss.Style) lipgloss.S
 				continue
 			}
 			st = m.st.tag
+			if listview.IsLinkTag(word) {
+				st = m.st.link
+			}
 		}
 		st = on(st)
 		if !t.Done && m.q.Highlights(word) {

@@ -84,6 +84,14 @@ sound_file = ""
 # The time the picker starts at for a new alarm.
 default_time = "7:00"
 
+[katnotes]
+# katnotes (github.com/devinthemtn/katnotes) links tasks to notes: a linked
+# task has kn:<id> note:<kind/id> tags and shows ⇄. These are the programs
+# add_to_note and open_note run: the command-line/terminal app, and the
+# desktop app that katTasks-gui opens notes in. Names on $PATH or full paths.
+command = "katnotes"
+gui_command = "katnotes-gui"
+
 [keys]
 # Rebind any action: name = "key" or ["key", "other key"]. Keys use names
 # like "ctrl+u", "enter", "space", "tab"; two plain characters such as "gg"

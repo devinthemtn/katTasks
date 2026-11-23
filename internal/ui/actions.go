@@ -141,6 +141,8 @@ func defineActions() []*action {
 			}
 			return nil
 		}},
+		{name: "add_to_note", desc: "add task to a katnotes note (linked: kn:)", group: groupEdit, needsTask: true, run: func(m *Model) tea.Cmd { return m.addToNote() }},
+		{name: "open_note", desc: "open the task's linked note in katnotes", group: groupView, needsTask: true, run: func(m *Model) tea.Cmd { return m.openNote() }},
 		{name: "settings", desc: "edit settings in your editor", group: groupView, run: func(m *Model) tea.Cmd { return m.editSettings() }},
 		{name: "config", desc: "open the settings folder in your editor", group: groupView, run: func(m *Model) tea.Cmd { return m.editConfigDir() }},
 		{name: "reload_config", desc: "reload settings", group: groupView, defaults: []string{"ctrl+r"}, run: func(m *Model) tea.Cmd { m.reloadConfig(); return nil }},

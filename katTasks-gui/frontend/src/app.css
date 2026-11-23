@@ -43,6 +43,7 @@ html, body, #app { margin: 0; height: 100%; overflow: hidden; }
 .c-context { color: var(--context); }
 .c-tag { color: var(--tag); }
 .c-highlight { color: var(--highlight); }
+.c-link { color: var(--link); }
 .c-pri-a { color: var(--pri-a); }
 .c-pri-b { color: var(--pri-b); }
 .c-pri-c { color: var(--pri-c); }

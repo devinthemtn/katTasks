@@ -258,11 +258,11 @@
         onwheel={(e) => { if (s?.mode === 'normal' && !s.help && !s.calendar && !s.agenda) onWheel(e, false); }}>
         {#if s.mode === 'palette' && s.input}
           <div class="pad">
-            <div class="line"><span class="prompt">{': '}</span><span class="input" use:followCaret onclick={clickInput} role="textbox" tabindex="-1">{caret(s.input.value, s.input.pos).before}<span class="caret">{caret(s.input.value, s.input.pos).at}</span>{caret(s.input.value, s.input.pos).after}</span></div>
+            <div class="line"><span class="prompt">{s.palettePrompt || ': '}</span><span class="input" use:followCaret onclick={clickInput} role="textbox" tabindex="-1">{caret(s.input.value, s.input.pos).before}<span class="caret">{caret(s.input.value, s.input.pos).at}</span>{caret(s.input.value, s.input.pos).after}</span></div>
             <div class="line">&nbsp;</div>
             <div class="scroll">
               {#if !s.palette?.length}
-                <div class="line dim">no matching command</div>
+                <div class="line dim">{s.paletteEmpty || 'no matching command'}</div>
               {/if}
               {#each s.palette ?? [] as p, i}
                 <div class="line palrow" class:sel={i === s.palIdx} use:scrollIntoView={i === s.palIdx}

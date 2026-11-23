@@ -162,6 +162,10 @@ ring = "30s"                 # how long it rings, "1s" to "30m"
 sound_file = ""              # empty = katTasks's alarm-clock beeping; .wav works everywhere
 default_time = "7:00"        # where the picker starts for a new alarm
 
+[katnotes]                   # see katnotes below
+command = "katnotes"         # run by add_to_note, and by open_note in the terminal
+gui_command = "katnotes-gui" # run by open_note in katTasks-gui
+
 [keys]                       # action = "key" or ["key", "key"]
 # add = ["a", "n"]
 # top = "gg"
@@ -195,6 +199,7 @@ keys one after the other, within 600 ms.
 | `visual` | `v` | visual mode: `space` marks rows; done, delete, priority and copy then apply to all marked |
 | `select_all` | `V` | mark every task shown |
 | `copy_line` / `copy_body` | `yy` / `yb` | copy the line / just the words, without priority, dates, `+` `@` or tags |
+| `add_to_note` | (none; `:add_to_note`) | add the task to a [katnotes](#katnotes) note, picked from a list you can search as you type |
 | `undo` | `u` | undo (50 steps; a bulk change is one step) |
 | `archive_done` | `A` | move completed tasks to done.txt |
 | `filter` | `/` | search; see below |
@@ -208,6 +213,7 @@ keys one after the other, within 600 ms.
 | `toggle_line_numbers` | `L` | show task numbers |
 | `theme_picker` | `T` | pick a theme, previewing as you move |
 | `cycle_theme` | (none) | switch to the next theme |
+| `open_note` | (none; `:open_note`) | open the task's linked note in [katnotes](#katnotes): its terminal app here, katnotes-gui from katTasks-gui |
 | `palette` | `:` `ctrl+p` | fuzzy-search every action, and your saved searches |
 | `reload` | `r` | re-read todo.txt from disk |
 | `reload_config` | `ctrl+r` | re-read the settings |
@@ -486,6 +492,30 @@ local t = kat.task
 if not t then return "no task" end
 kat.add(t.text:gsub("due:%S+", "") .. " due:" .. kat.date("+1w"))
 ```
+
+## katnotes
+
+[katnotes](https://github.com/devinthemtn/katnotes) (Markdown notes) can link
+a task in a note to a line here, so finishing it in either app finishes it in
+both. With `enabled = true` under `[todo_txt]` in katnotes' settings, a linked
+line carries two tags:
+
+    (A) 2026-11-23 call the plumber due:2026-11-27 kn:7f3a2c note:page/house
+
+- `kn:` (the link's ID) and `note:` are drawn in the theme's `link` color,
+  and a linked task shows `⇄` beside its due date.
+- **Linked to notes** in the sidebar lists the linked tasks.
+- `:add_to_note` adds the task under the cursor to a note: pick one (or
+  today's journal) from the list, typing to narrow it. katnotes writes the
+  task into the note and the tags here, and the list reloads.
+- `:open_note` opens the linked note: the katnotes terminal app in place of
+  katTasks (quit it to come back), or katnotes-gui from katTasks-gui, which
+  switches an open katnotes-gui window to the note.
+- Both run the programs set under `[katnotes]` in the settings (`katnotes`
+  and `katnotes-gui` on your `$PATH` by default).
+
+Don't edit or remove the `kn:` and `note:` tags by hand. katnotes keeps the
+text, due date, priority and done state in step from the note.
 
 ## Themes
 

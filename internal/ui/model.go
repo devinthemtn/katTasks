@@ -59,7 +59,9 @@ type Model struct {
 	cfg     config.Config
 	tasks   []*todo.Task
 	modTime time.Time
-	undo    [][]*todo.Task
+	// watchSeq numbers the files.watch timer; see watch.go
+	watchSeq int
+	undo     [][]*todo.Task
 
 	visible []*todo.Task
 	cursor  int
@@ -210,8 +212,8 @@ func (m *Model) load() error {
 }
 
 // reloadConfig re-reads the settings file, and the todo file if its path
-// changed.
-func (m *Model) reloadConfig() {
+// changed. It returns the restarted files.watch timer.
+func (m *Model) reloadConfig() tea.Cmd {
 	cfg, _, errs := config.Load(m.opts.ConfigPath)
 	oldTodo := m.cfg.Files.Todo
 	errs = append(errs, m.applyConfig(cfg)...)
@@ -225,13 +227,16 @@ func (m *Model) reloadConfig() {
 	}
 	if len(errs) > 0 {
 		m.showConfigErrors(errs)
-		return
+	} else {
+		m.setStatus("settings reloaded from %s", m.opts.ConfigPath)
 	}
-	m.setStatus("settings reloaded from %s", m.opts.ConfigPath)
+	return m.watchTick()
 }
 
-// Init implements tea.Model.
-func (m Model) Init() tea.Cmd { return nil }
+// Init implements tea.Model. It starts the files.watch timer.
+func (m Model) Init() tea.Cmd {
+	return func() tea.Msg { return watchStartMsg{} }
+}
 
 // ---- state helpers ---------------------------------------------------------
 

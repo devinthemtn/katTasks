@@ -131,6 +131,7 @@ theme = "default"            # default | terminal | nord | gruvbox | dracula | a
 [files]
 todo = "~/todo.txt"          # ~ and $VARS are expanded
 done = ""                    # empty = done.txt next to todo
+watch = "3m"                 # recheck todo.txt for outside changes this often; false = off
 
 [tasks]
 add_creation_date = true     # prefix new tasks with today's date
@@ -217,6 +218,7 @@ keys one after the other, within 600 ms.
 | `open_note` | (none; `:open_note`) | open the task's linked note in [katnotes](#katnotes): its terminal app here, katnotes-gui from katTasks-gui |
 | `palette` | `:` `ctrl+p` | fuzzy-search every action, and your saved searches |
 | `reload` | `r` | re-read todo.txt from disk |
+| `sync` | (none; `:sync`) | re-read todo.txt if another program changed it, keeping the cursor on its task (`files.watch` does this every few minutes) |
 | `reload_config` | `ctrl+r` | re-read the settings |
 | `settings` | (none; `:settings`) | open the settings file in your editor, then re-read it when the editor closes |
 | `config` | (none; `:config`) | open the settings folder (themes, scripts) in your editor, then re-read the settings |

@@ -31,6 +31,9 @@ const (
 	DefaultFontSize = 14
 )
 
+// DefaultWatch is how often files.watch checks todo.txt unless set.
+const DefaultWatch = 3 * time.Minute
+
 // SettingsFile is the settings file name inside Dir().
 const SettingsFile = "config.toml"
 
@@ -43,8 +46,12 @@ var DefaultSettingsFile string
 type Config struct {
 	Theme string `toml:"theme"`
 	Files struct {
-		Todo string `toml:"todo"`
-		Done string `toml:"done"`
+		Todo  string `toml:"todo"`
+		Done  string `toml:"done"`
+		Watch any    `toml:"watch"` // a time such as "3m", or false
+
+		// WatchEvery is Watch parsed; 0 means off.
+		WatchEvery time.Duration `toml:"-"`
 	} `toml:"files"`
 	Tasks struct {
 		AddCreationDate bool `toml:"add_creation_date"`
@@ -215,6 +222,29 @@ func (c *Config) normalize() []error {
 		c.Files.Done = filepath.Join(filepath.Dir(c.Files.Todo), "done.txt")
 	} else {
 		c.Files.Done = Expand(c.Files.Done)
+	}
+
+	switch v := c.Files.Watch.(type) {
+	case bool:
+		if v {
+			c.Files.WatchEvery = DefaultWatch // true: on, at the default rate
+		} else {
+			c.Files.WatchEvery = 0
+		}
+	case string:
+		d, err := time.ParseDuration(strings.TrimSpace(v))
+		switch {
+		case err == nil && d == 0:
+			c.Files.WatchEvery = 0
+		case err != nil || d < time.Second || d > 24*time.Hour:
+			bad("files.watch", fmt.Sprintf("%q", v), `want a time from "1s" to "24h", such as "3m", or false`)
+			c.Files.Watch, c.Files.WatchEvery = DefaultWatch.String(), DefaultWatch
+		default:
+			c.Files.WatchEvery = d
+		}
+	default:
+		bad("files.watch", v, `want a time such as "3m", or false`)
+		c.Files.Watch, c.Files.WatchEvery = DefaultWatch.String(), DefaultWatch
 	}
 
 	valid := false

@@ -16,6 +16,10 @@ theme = "default"
 todo = "~/todo.txt"
 # Where archived (completed) tasks go. Empty means done.txt next to todo.
 done = ""
+# How often katTasks and katTasks-gui check todo.txt for changes made by
+# other programs while open, and reload it if it changed, e.g. "30s", "3m",
+# "1h". false turns this off (r still reloads by hand).
+watch = "3m"
 
 [tasks]
 # Prefix new tasks with today's date.

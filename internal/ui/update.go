@@ -19,8 +19,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.clampCursor()
 		return m, nil
 	case editorDoneMsg:
-		m.editorDone(msg)
-		return m, nil
+		return m, m.editorDone(msg)
+	case watchStartMsg:
+		return m, m.watchTick()
+	case watchMsg:
+		return m, m.watched(msg)
 	case notesListedMsg:
 		m.notesListed(msg)
 		return m, nil

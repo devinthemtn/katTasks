@@ -3,6 +3,12 @@
 ## Unreleased
 
 - `-v` works as `-version` does, in `katTasks` and `katTasks-gui`.
+- New `files.watch` setting: while open, katTasks and katTasks-gui recheck
+  todo.txt this often (default `"3m"`) and reload it if another program
+  changed it, keeping the cursor on its task. `false` turns it off. A change
+  found while you're typing a task or have tasks selected waits for the next
+  check. `katTasks -update-config` adds the setting to an existing file.
+- `:sync` does the same check right away.
 
 ## 2.0.1 (2026-11-23)
 

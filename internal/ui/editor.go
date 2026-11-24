@@ -76,12 +76,12 @@ func systemOpen(path string) error {
 
 // editorDone re-reads the settings after the editor closes, since they or
 // a theme in their folder may have changed.
-func (m *Model) editorDone(msg editorDoneMsg) {
+func (m *Model) editorDone(msg editorDoneMsg) tea.Cmd {
 	if msg.err != nil {
 		m.setError("editor: %v", msg.err)
-		return
+		return nil
 	}
-	m.reloadConfig()
+	return m.reloadConfig()
 }
 
 // editSettings opens the settings file; editConfigDir opens its folder.

@@ -39,7 +39,9 @@ func NewHeadless(m Model, hop HeadlessOptions) *Headless {
 	if m.width == 0 {
 		m.width, m.height = 100, 30
 	}
-	return &Headless{m: m, hop: hop}
+	h := &Headless{m: m, hop: hop}
+	h.run(h.m.watchTick()) // the files.watch timer; Init would redraw for nothing
+	return h
 }
 
 // do runs fn on the model and returns the new screen. A command fn returns

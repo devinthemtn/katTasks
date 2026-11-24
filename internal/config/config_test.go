@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDefaultsMatchFile(t *testing.T) {
@@ -294,5 +295,27 @@ func TestKatnotesPrograms(t *testing.T) {
 	}
 	if got := program("./kn", "katnotes"); !filepath.IsAbs(got) {
 		t.Errorf("./kn = %q, want an absolute path", got)
+	}
+}
+
+func TestParseWatch(t *testing.T) {
+	for _, tc := range []struct {
+		toml string
+		want time.Duration
+		bad  bool
+	}{
+		{"", DefaultWatch, false},
+		{"watch = false", 0, false},
+		{"watch = true", DefaultWatch, false},
+		{`watch = "30s"`, 30 * time.Second, false},
+		{`watch = "0m"`, 0, false},
+		{`watch = "soon"`, DefaultWatch, true},
+		{`watch = "10ms"`, DefaultWatch, true},
+		{"watch = 5", DefaultWatch, true},
+	} {
+		c, errs := Parse("[files]\n" + tc.toml + "\n")
+		if c.Files.WatchEvery != tc.want || (len(errs) > 0) != tc.bad {
+			t.Errorf("%s: every %v, errs %v; want %v, bad %v", tc.toml, c.Files.WatchEvery, errs, tc.want, tc.bad)
+		}
 	}
 }

@@ -278,12 +278,14 @@ func TestUpdateFile(t *testing.T) {
 // [katnotes] programs: bare names stay for $PATH, paths are expanded.
 func TestKatnotesPrograms(t *testing.T) {
 	home, _ := os.UserHomeDir()
+	// A full path on this OS: /opt/kn/kn isn't one on Windows (no drive).
+	abs := filepath.Join(t.TempDir(), "kn")
 	cases := map[string]string{
 		"":             "katnotes",
 		"  katnotes  ": "katnotes",
 		"kn":           "kn",
 		"~/bin/kn":     filepath.Join(home, "bin/kn"),
-		"/opt/kn/kn":   "/opt/kn/kn",
+		abs:            abs,
 	}
 	for in, want := range cases {
 		if got := program(in, "katnotes"); got != want {

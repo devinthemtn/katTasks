@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `-v` works as `-version` does, in `katTasks` and `katTasks-gui`.
+
 ## 2.0.1 (2026-11-23)
 
 - `task release` builds the Linux x86-64 and Windows release files locally

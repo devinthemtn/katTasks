@@ -45,6 +45,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	fs.BoolVar(updateConfig, "updateconfig", false, "")
 	fs.StringVar(makeTheme, "maketheme", "", "")
 	showVersion := fs.Bool("version", false, "print the version, then exit")
+	fs.BoolVar(showVersion, "v", false, "same as -version")
 	showPaths := fs.Bool("paths", false, "print the settings file, todo.txt and done.txt in use, then exit")
 	asJSON := fs.Bool("json", false, "commands print JSON")
 	force := fs.Bool("f", false, "commands don't ask before deleting")

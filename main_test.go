@@ -24,6 +24,9 @@ func TestVersionAndHelp(t *testing.T) {
 	if code, out, _ := katTasks(t, dir, "", "-version"); code != 0 || !strings.HasPrefix(out, "katTasks ") {
 		t.Errorf("-version: %d %q", code, out)
 	}
+	if code, out, _ := katTasks(t, dir, "", "-v"); code != 0 || !strings.HasPrefix(out, "katTasks ") {
+		t.Errorf("-v: %d %q", code, out)
+	}
 	for _, args := range [][]string{{"-h"}, {"help"}} {
 		code, out, errOut := katTasks(t, dir, "", args...)
 		if code != 0 || !strings.Contains(out, "Usage") || errOut != "" {

@@ -61,7 +61,7 @@ and it reads the same settings file and todo.txt. It also adds:
   isn't needed.
 
 `ctrl+c` doesn't quit, as it would in a terminal; use `q` or close the window.
-It takes `-file`, `-config` and `-version` like `katTasks`.
+It takes `-file`, `-config` and `-version` (or `-v`) like `katTasks`.
 
 The app is built with [Wails 3](https://v3.wails.io) and lives in
 `katTasks-gui/`, as its own Go module, because Wails needs a newer Go (1.26)
@@ -114,7 +114,7 @@ It also starts the background reminder and sets it to start at sign-in.
 | `-make-theme NAME` | write the current theme to `themes/NAME.toml` to edit, then exit |
 | `-paths` | print the settings file, todo.txt and done.txt in use, then exit |
 | `-json`, `-f` | for commands: print JSON; delete without asking |
-| `-version`, `-h` | print the version / help, which ends with examples and the settings path. `katTasks help` does the same. It's in color in a terminal (`NO_COLOR=1` turns that off) and plain when piped, so `katTasks -h \| less` works |
+| `-version` (or `-v`), `-h` | print the version / help, which ends with examples and the settings path. `katTasks help` does the same. It's in color in a terminal (`NO_COLOR=1` turns that off) and plain when piped, so `katTasks -h \| less` works |
 
 ## Settings
 

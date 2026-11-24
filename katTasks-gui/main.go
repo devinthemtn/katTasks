@@ -43,6 +43,7 @@ func main() {
 	cfgPath := flag.String("config", config.DefaultPath(), "settings file")
 	todoFile := flag.String("file", "", "todo.txt to open (overrides files.todo)")
 	showVersion := flag.Bool("version", false, "print the version, then exit")
+	flag.BoolVar(showVersion, "v", false, "same as -version")
 	flag.Parse()
 	if *showVersion {
 		fmt.Println("katTasks-gui", appVersion())

@@ -1,5 +1,40 @@
 # Changelog
 
+## 2.0.1 (2026-11-23)
+
+- `task release` builds the Linux x86-64 and Windows release files locally
+  into `bin/release-<version>/`, with checksums. It stops if the tree isn't
+  clean, the GUI's build files aren't at the tag's version or this file has
+  no section for it.
+- `task bump-version V=x.y.z` sets the version the GUI's build files carry
+  (Windows file properties, macOS About, Linux packages), which had been
+  left behind.
+- The README covers the katnotes integration and the release steps.
+
+## 2.0.0 (2026-11-23)
+
+Tasks can be linked to notes in
+[katnotes](https://github.com/devinthemtn/katnotes), so finishing one in
+either app finishes it in both. See "katnotes" in the README.
+
+- A linked task carries `kn:<id>` and `note:<kind/id>` tags, drawn in the
+  theme's new `link` color, and shows `⇄` beside its due date. Theme files
+  that don't set `link` get it from their `base`.
+- **Linked to notes** in the sidebar lists the linked tasks.
+- `add_to_note` (`:add_to_note`) adds the task to a katnotes note, picked
+  from a list you can search as you type.
+- `open_note` (`:open_note`) opens the linked note: the katnotes terminal app
+  from the terminal, katnotes-gui from katTasks-gui.
+- New `[katnotes]` settings, `command` and `gui_command`, name the programs
+  to run: a bare name is looked up on `$PATH`, or give a full path.
+
+### Changed
+
+- Completing a recurring (`rec:`) task that is linked leaves `kn:` and
+  `note:` on the finished task, which is the one the note stands for. The
+  next occurrence starts unlinked. Unlinked tasks recur as before, and
+  nothing else in the 1.0 promise changed.
+
 ## 1.1.0 (2026-11-22)
 
 - Text inside `{{ }}` in a task is drawn in the theme's new `highlight`

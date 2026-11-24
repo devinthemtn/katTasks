@@ -96,6 +96,57 @@ tasks:
         project.nsi
       - echo "Built {{.SETUP}}"
 
+  # The GUI's build files carry their own copy of the version (shown by
+  # Windows file properties, macOS About, Linux packages). Run this before
+  # tagging a release, and commit it: task bump-version V=1.2.3
+  bump-version:
+    desc: Set the version in the GUI's build files, e.g. task bump-version V=1.2.3
+    requires:
+      vars: [V]
+    preconditions:
+      - sh: echo "{{.V}}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
+        msg: "V must be x.y.z without a leading v, got {{.V}}"
+    dir: '{{.GUI_DIR}}'
+    cmds:
+      - perl -pi -e 's/^(\s*version:\s*)"[^"]*"/${1}"{{.V}}"/' build/config.yml build/linux/nfpm/nfpm.yaml
+      - perl -pi -e 's/("(?:file_version|ProductVersion)":\s*)"[^"]*"/${1}"{{.V}}"/' build/windows/info.json
+      - perl -0pi -e 's{(<key>CFBundle(?:Short)?Version(?:String)?</key>\s*<string>)[^<]*}{${1}{{.V}}}g' build/darwin/Info.plist build/darwin/Info.dev.plist
+      - cd frontend && npm version --no-git-tag-version --allow-same-version {{.V}} >/dev/null
+      - echo "Version {{.V}} set in {{.GUI_DIR}}/build and frontend/package.json"
+
+  # The Linux and Windows release files, built locally into
+  # bin/release-<version>/ with the names the release workflow gives them:
+  # the terminal app and desktop app tarballs, the Windows installer and
+  # checksums.txt. Run it on the tagged commit, so the version is the tag.
+  # GitHub releases are still published by the workflow when the tag is pushed.
+  release:
+    desc: Build the release files into bin/release-<version>/ (run on a tagged, clean commit)
+    vars:
+      OUT: '{{.BIN_DIR}}/release-{{.VERSION}}'
+      CLI_NAME: 'katTasks_{{.VERSION}}_linux_amd64'
+      GUI_NAME: 'katTasks-gui_{{.VERSION}}_linux_amd64'
+      SETUP: 'katTasks-{{.VERSION}}-windows-amd64-setup.exe'
+    preconditions:
+      - sh: git describe --tags --exact-match >/dev/null 2>&1
+        msg: "HEAD has no tag: git tag -a vX.Y.Z first"
+      - sh: git diff --quiet HEAD
+        msg: "the working tree has uncommitted changes"
+      - sh: 'grep -q "^  version: \"{{.VERSION}}\"" {{.GUI_DIR}}/build/config.yml'
+        msg: "the GUI's build files aren't at {{.VERSION}}: task bump-version V={{.VERSION}}, commit, and move the tag"
+      - sh: grep -q '^## {{.VERSION}} ' CHANGELOG.md
+        msg: "CHANGELOG.md has no '## {{.VERSION}}' section"
+    cmds:
+      - task: build
+      - task: build-gui
+      - task: build-win-installer
+      - rm -rf {{.OUT}} && mkdir -p {{.OUT}}/{{.CLI_NAME}} {{.OUT}}/{{.GUI_NAME}}
+      - cp {{.BIN_DIR}}/katTasks README.md SCRIPTING.md LICENSE {{.OUT}}/{{.CLI_NAME}}/
+      - cp {{.GUI_DIR}}/bin/katTasks-gui {{.GUI_DIR}}/build/linux/katTasks-gui.desktop {{.GUI_DIR}}/build/appicon.png README.md LICENSE {{.OUT}}/{{.GUI_NAME}}/
+      - cd {{.OUT}} && tar czf {{.CLI_NAME}}.tar.gz {{.CLI_NAME}} && tar czf {{.GUI_NAME}}.tar.gz {{.GUI_NAME}} && rm -rf {{.CLI_NAME}} {{.GUI_NAME}}
+      - cp {{.BIN_DIR}}/{{.SETUP}} {{.OUT}}/
+      - cd {{.OUT}} && sha256sum {{.CLI_NAME}}.tar.gz {{.GUI_NAME}}.tar.gz {{.SETUP}} > checksums.txt
+      - ls -l {{.OUT}}
+
   dev-gui:
     desc: Run the GUI with hot reload
     cmds:

@@ -76,6 +76,7 @@ top of the repository:
     task                       # just build: bin/katTasks and katTasks-gui/bin/katTasks-gui
     task build-windows         # bin/katTasks.exe and katTasks-gui/bin/katTasks-gui.exe, from any OS
     task build-win-installer   # a Windows installer, bin/katTasks-<version>-windows-amd64-setup.exe (needs makensis)
+    task release               # on a tagged commit: the release files, in bin/release-<version>/
     task dev-gui               # run the app with live reload while working on it
     task test                  # every Go test, and the window's key-handling tests
 
@@ -626,13 +627,25 @@ first, on Linux (x86-64 and ARM64), Windows (x86-64 and ARM64) and macOS (one
 universal `.app`), and its `katTasks-gui_…` archives go in the same release,
 with the Windows installer (`katTasks-<version>-windows-amd64-setup.exe`):
 
-    git tag -a v1.0.0 -m "katTasks 1.0.0"
-    git push origin v1.0.0
+    task bump-version V=1.2.0   # the version in the GUI's build files; commit it
+    git tag -a v1.2.0 -m "katTasks 1.2.0"
+    git push origin v1.2.0
 
-The tag is the version: `katTasks -version` reports it, and there is nothing to
-bump in the code. Edit the generated notes on GitHub afterwards if you like. To
-try the build without publishing, run the workflow by hand (Actions → release
-→ Run workflow); the archives are attached to the run. Locally:
+The tag is the version: `katTasks -version` and `katTasks-gui -version` report
+it. The GUI's build files keep their own copy, which Windows file properties,
+macOS About and the Linux packages show, so `task bump-version` sets it in
+each of them (and in `frontend/package.json`). Edit the generated notes on
+GitHub afterwards if you like. To try the build without publishing, run the
+workflow by hand (Actions → release → Run workflow); the archives are attached
+to the run.
+
+`task release`, run on the tagged commit, builds the Linux x86-64 and Windows
+files locally into `bin/release-<version>/`, with the names the workflow gives
+them: `katTasks_<version>_linux_amd64.tar.gz`,
+`katTasks-gui_<version>_linux_amd64.tar.gz`, the Windows installer and
+`checksums.txt`. It stops if the working tree isn't clean, the GUI's build
+files aren't at the tag's version or CHANGELOG.md has no section for it.
+Every platform locally:
 `go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean`.
 
 ## License

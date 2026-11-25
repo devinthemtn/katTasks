@@ -117,6 +117,11 @@ html, body, #app { margin: 0; height: 100%; overflow: hidden; }
 .input.grow { flex: 1 1 auto; }
 .footer .line:first-child, .popup .line:nth-child(3) { display: flex; }
 .caret { background: var(--fg); color: var(--bg); }
+/* The add/edit popup's input wraps instead of scrolling; later lines hang
+   under the first, after the › prompt. */
+.popup .line.wrapline { white-space: normal; overflow: visible; text-overflow: clip; height: auto; }
+.input.wrapped { white-space: pre-wrap; overflow-wrap: anywhere; overflow: visible; }
+.changeable { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
 
 /* footer */
 .footer { flex: none; }

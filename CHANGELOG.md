@@ -9,6 +9,15 @@
   found while you're typing a task or have tasks selected waits for the next
   check. `katTasks -update-config` adds the setting to an existing file.
 - `:sync` does the same check right away.
+- In the add/edit popup, `←` `→` always move the cursor; they no longer get
+  stuck on `+project`, `@context`, `due:` and similar words. `↑` `↓` choose a
+  suggestion, and the list shows only while you type, so moving the cursor
+  and pressing `enter` saves instead of completing.
+- The add/edit box underlines the words it has a list or picker for
+  (`+project`, `@context`, `due:`, `rec:`, `alarm:`, `at:`). `tab` anywhere
+  on one lists what it could be instead and replaces the whole word.
+- A long task wraps onto more lines of the add/edit box instead of
+  scrolling sideways, in katTasks and katTasks-gui.
 
 ## 2.0.1 (2026-11-23)
 

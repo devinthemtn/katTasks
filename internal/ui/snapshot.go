@@ -124,10 +124,21 @@ type Input struct {
 	SuggIdx  int      `json:"suggIdx"`
 	SuggDesc string   `json:"suggDesc"` // what the chosen /script does
 	Hint     string   `json:"hint"`
+	// Words are the words tab can change (+project, @context, due:, rec:,
+	// alarm:, at:), for a task being added or edited.
+	Words []InputWord `json:"words"`
 	// Alarm is the alarm: date and time picker, when it's open.
 	Alarm *AlarmPicker `json:"alarm"`
 	// Choice is the list a /script asked for with kat.choose, when it's open.
 	Choice *Choice `json:"choice"`
+}
+
+// InputWord is a word of the input, Start to End in runes; Kind is
+// "project", "context" or "tag".
+type InputWord struct {
+	Start int    `json:"start"`
+	End   int    `json:"end"`
+	Kind  string `json:"kind"`
 }
 
 // Choice is a /script's kat.choose list.
@@ -368,10 +379,14 @@ func (m Model) inputState() *Input {
 		in.Choice = &Choice{Prompt: c.prompt, Options: c.options, Idx: c.idx}
 	}
 	switch m.mode {
-	case modeAdd:
+	case modeAdd, modeEdit:
 		in.Label = "New task"
-	case modeEdit:
-		in.Label = "Edit task"
+		if m.mode == modeEdit {
+			in.Label = "Edit task"
+		}
+		for _, w := range inputWords(in.Value) {
+			in.Words = append(in.Words, InputWord{w.start, w.end, w.kind})
+		}
 	case modeFilter:
 		in.Label, in.Hint = "filter", m.inputHint()
 	case modeSaveName:

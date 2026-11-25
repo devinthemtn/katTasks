@@ -237,6 +237,12 @@ export interface Input {
     "hint": string;
 
     /**
+     * Words are the words tab can change (+project, @context, due:, rec:,
+     * alarm:, at:), for a task being added or edited.
+     */
+    "words": InputWord[] | null;
+
+    /**
      * Alarm is the alarm: date and time picker, when it's open.
      */
     "alarm": AlarmPicker | null;
@@ -245,6 +251,16 @@ export interface Input {
      * Choice is the list a /script asked for with kat.choose, when it's open.
      */
     "choice": Choice | null;
+}
+
+/**
+ * InputWord is a word of the input, Start to End in runes; Kind is
+ * "project", "context" or "tag".
+ */
+export interface InputWord {
+    "start": number;
+    "end": number;
+    "kind": string;
 }
 
 /**

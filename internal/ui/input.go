@@ -82,11 +82,7 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.acceptSuggestion()
 			return m, nil
 		}
-		if _, w := m.wordAtCursor(); typingTask && isAlarmWord(w) {
-			m.openAlarmPicker() // change an alarm: already typed
-			return m, nil
-		} else if typingTask && isDueWord(w) {
-			m.openDuePicker() // change a due: already typed
+		if typingTask && m.changeWord() {
 			return m, nil
 		}
 	case "down", "ctrl+n":
@@ -97,11 +93,8 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.moveSugg(-1) {
 			return m, nil
 		}
-	case "right", "left": // in the filter, these keep moving the cursor
-		if typingTask && m.moveSugg(map[string]int{"right": 1, "left": -1}[msg.String()]) {
-			return m, nil
-		}
 	}
+	before := m.input.Value()
 	var cmd tea.Cmd
 	m.input, cmd = m.input.Update(msg)
 	// A terminal sends fast typing as one message ("due:" or "e:"), so look
@@ -117,7 +110,13 @@ func (m Model) updateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 	}
-	m.updateSuggestions()
+	if m.input.Value() != before {
+		m.updateSuggestions()
+	} else {
+		// Only moving the cursor: hide the list, so the arrows (and enter)
+		// don't get caught on every +project or due: word passed over.
+		m.sugg, m.suggIdx = nil, 0
+	}
 	if m.mode == modeFilter {
 		m.filter = m.input.Value()
 		m.refresh(nil)
@@ -233,6 +232,112 @@ func (m *Model) wordAtCursor() (int, string) {
 		start--
 	}
 	return start, string(val[start:pos])
+}
+
+// wordSpanAtCursor returns where (in runes) the whole word the cursor is
+// in, or just after, starts and ends.
+func (m *Model) wordSpanAtCursor() (int, int) {
+	val := []rune(m.input.Value())
+	pos := clamp(m.input.Position(), 0, len(val))
+	start, end := pos, pos
+	for start > 0 && val[start-1] != ' ' {
+		start--
+	}
+	for end < len(val) && val[end] != ' ' {
+		end++
+	}
+	return start, end
+}
+
+// wordKind is "project", "context" or "tag" for a word that has a list or
+// a picker to change it with (+project, @context, due:, alarm:, rec:, at:),
+// and "" for any other word.
+func wordKind(w string) string {
+	lw := strings.ToLower(w)
+	switch {
+	case len(w) > 1 && w[0] == '+':
+		return "project"
+	case len(w) > 1 && w[0] == '@':
+		return "context"
+	case isDueWord(w), isAlarmWord(w), strings.HasPrefix(lw, "rec:"), strings.HasPrefix(lw, "at:"):
+		return "tag"
+	}
+	return ""
+}
+
+// inputWord is a word of the line being typed that wordKind knows, from
+// rune start to end.
+type inputWord struct {
+	start, end int
+	kind       string
+}
+
+// inputWords finds the words of val that can be changed with tab.
+func inputWords(val string) []inputWord {
+	var out []inputWord
+	r := []rune(val)
+	for i := 0; i < len(r); {
+		if r[i] == ' ' {
+			i++
+			continue
+		}
+		j := i
+		for j < len(r) && r[j] != ' ' {
+			j++
+		}
+		if k := wordKind(string(r[i:j])); k != "" {
+			out = append(out, inputWord{i, j, k})
+		}
+		i = j
+	}
+	return out
+}
+
+// changeWord handles tab on a word wordKind knows: it puts the cursor at
+// the word's end and opens its picker (due:, alarm:) or lists the other
+// values it could be (other projects or contexts, rec: intervals, at:
+// times), to replace the whole word with. False if the cursor isn't on one.
+func (m *Model) changeWord() bool {
+	start, end := m.wordSpanAtCursor()
+	w := string([]rune(m.input.Value())[start:end])
+	if wordKind(w) == "" {
+		return false
+	}
+	m.input.SetCursor(end)
+	lw := strings.ToLower(w)
+	var pool []string
+	switch {
+	case isDueWord(w):
+		m.openDuePicker()
+		return true
+	case isAlarmWord(w):
+		m.openAlarmPicker()
+		return true
+	case w[0] == '+' || w[0] == '@':
+		for _, k := range m.known {
+			if k[0] == w[0] {
+				pool = append(pool, k)
+			}
+		}
+	case strings.HasPrefix(lw, "rec:"):
+		for _, k := range keywordWords {
+			if strings.HasPrefix(k, "rec:") {
+				pool = append(pool, k)
+			}
+		}
+	default: // at:
+		pool = atSuggestions("at:", time.Now())
+	}
+	m.sugg, m.suggIdx = nil, 0
+	for _, c := range pool {
+		if !strings.EqualFold(c, w) {
+			m.sugg = append(m.sugg, c)
+			if len(m.sugg) == 8 {
+				break
+			}
+		}
+	}
+	return true
 }
 
 func (m *Model) updateSuggestions() {

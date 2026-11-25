@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/mattn/go-runewidth"
 )
 
 // viewTaskPopup renders the centered box used to add or edit a task: the
@@ -16,10 +17,13 @@ func (m Model) viewTaskPopup() string {
 		title = "Edit task"
 	}
 
-	lines := []string{
-		m.st.prompt.Render(title),
-		"",
-		m.st.prompt.Render("› ") + m.input.View(),
+	lines := []string{m.st.prompt.Render(title), ""}
+	for i, l := range m.viewWrappedInput(w - 2) {
+		if i == 0 {
+			lines = append(lines, m.st.prompt.Render("› ")+l)
+		} else {
+			lines = append(lines, "  "+l) // lined up under the text
+		}
 	}
 	if len(m.sugg) > 0 {
 		var ss []string
@@ -64,7 +68,7 @@ func (m Model) viewTaskPopup() string {
 		key("/name ") + m.st.faint.Render("run a Lua script from scripts/"),
 		"",
 		key("enter") + m.st.faint.Render(" save · ") + key("esc") + m.st.faint.Render(" cancel · ") +
-			key("tab") + m.st.faint.Render(" complete · ") + key("←→↑↓") + m.st.faint.Render(" choose"),
+			key("tab") + m.st.faint.Render(" complete/change ") + m.st.text.Underline(true).Render("this") + m.st.faint.Render(" · ") + key("↑↓") + m.st.faint.Render(" choose"),
 	}
 	lines = append(lines, m.st.faint.Render(strings.Repeat("─", w)))
 	for _, l := range help {
@@ -72,6 +76,95 @@ func (m Model) viewTaskPopup() string {
 	}
 
 	return m.st.paneFocused.Padding(0, 1).Width(w + 2).Render(strings.Join(lines, "\n"))
+}
+
+// wrapInput splits r into lines at most width cells wide, breaking after
+// a space where it can (the space stays at the end of its line, so the
+// cursor can sit on it) and inside a word only when it's longer than a
+// line. It returns each line's start and end in runes; there's always at
+// least one, and a last empty one when the cursor at the end of a full line
+// needs somewhere to go.
+func wrapInput(r []rune, width int) [][2]int {
+	width = max(width, 1)
+	var out [][2]int
+	i := 0
+	for {
+		cells, j, brk := 0, i, -1
+		for j < len(r) {
+			cw := max(runewidth.RuneWidth(r[j]), 1)
+			if cells+cw > width {
+				break
+			}
+			cells += cw
+			if r[j] == ' ' {
+				brk = j + 1
+			}
+			j++
+		}
+		if j == len(r) {
+			out = append(out, [2]int{i, j})
+			if cells >= width { // no room left for the cursor
+				out = append(out, [2]int{j, j})
+			}
+			return out
+		}
+		if brk > i {
+			j = brk
+		} else if j == i {
+			j++ // a rune wider than the line
+		}
+		out = append(out, [2]int{i, j})
+		i = j
+	}
+}
+
+// viewWrappedInput draws the task being typed over as many lines as it
+// takes, width cells each, with the cursor and the words tab can change
+// underlined in their colours.
+func (m Model) viewWrappedInput(width int) []string {
+	r := []rune(m.input.Value())
+	pos := clamp(m.input.Position(), 0, len(r))
+	kind := make([]string, len(r))
+	for _, w := range inputWords(m.input.Value()) {
+		for i := w.start; i < w.end; i++ {
+			kind[i] = w.kind
+		}
+	}
+	style := func(k string) lipgloss.Style {
+		switch k {
+		case "project":
+			return m.st.project.Underline(true)
+		case "context":
+			return m.st.context.Underline(true)
+		case "tag":
+			return m.st.tag.Underline(true)
+		}
+		return m.st.text
+	}
+	cursor := lipgloss.NewStyle().Reverse(true)
+	var lines []string
+	spans := wrapInput(r, width)
+	for n, sp := range spans {
+		var b strings.Builder
+		for i := sp[0]; i < sp[1]; {
+			if i == pos {
+				b.WriteString(cursor.Render(string(r[i])))
+				i++
+				continue
+			}
+			j := i
+			for j < sp[1] && j != pos && kind[j] == kind[i] {
+				j++
+			}
+			b.WriteString(style(kind[i]).Render(string(r[i:j])))
+			i = j
+		}
+		if pos == len(r) && n == len(spans)-1 {
+			b.WriteString(cursor.Render(" "))
+		}
+		lines = append(lines, b.String())
+	}
+	return lines
 }
 
 // overlay draws fg on top of bg, centered.

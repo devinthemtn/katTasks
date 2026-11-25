@@ -2,6 +2,8 @@ package ui
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"os"
 	"strings"
 	"testing"
@@ -388,14 +390,14 @@ func TestSuggestionArrowsAndEnter(t *testing.T) {
 	if s.Input.SuggIdx != 0 || len(s.Input.Sugg) < 2 {
 		t.Fatalf("suggestions %q at %d", s.Input.Sugg, s.Input.SuggIdx)
 	}
-	if s = h.Key("right"); s.Input.SuggIdx != 1 {
-		t.Fatalf("right: at %d", s.Input.SuggIdx)
+	if s = h.Key("down"); s.Input.SuggIdx != 1 {
+		t.Fatalf("down: at %d", s.Input.SuggIdx)
 	}
-	if s = h.Key("left"); s.Input.SuggIdx != 0 {
-		t.Fatalf("left: at %d", s.Input.SuggIdx)
+	if s = h.Key("up"); s.Input.SuggIdx != 0 {
+		t.Fatalf("up: at %d", s.Input.SuggIdx)
 	}
-	if s = h.Key("left"); s.Input.SuggIdx != len(s.Input.Sugg)-1 {
-		t.Fatalf("left wraps: at %d", s.Input.SuggIdx)
+	if s = h.Key("up"); s.Input.SuggIdx != len(s.Input.Sugg)-1 {
+		t.Fatalf("up wraps: at %d", s.Input.SuggIdx)
 	}
 	pick := s.Input.Sugg[s.Input.SuggIdx]
 	s = h.Key("enter") // completes, doesn't save
@@ -404,6 +406,41 @@ func TestSuggestionArrowsAndEnter(t *testing.T) {
 	}
 	if s = h.Key("enter"); s.Input != nil { // no suggestions now: saves
 		t.Fatalf("second enter kept the input open: %+v", s.Input)
+	}
+}
+
+// The arrows move the cursor past a word that has suggestions instead of
+// getting caught there, and enter then saves what was typed.
+func TestArrowsMovePastSuggestionWords(t *testing.T) {
+	h, _ := headless(t)
+	s := keys(h, "a")
+	const text = "Lunch at:9 now"
+	for _, r := range text {
+		s = h.Key(string(r))
+	}
+	n := len([]rune(text))
+	for i := 1; i <= n; i++ {
+		s = h.Key("left")
+		if s.Input.Pos != n-i || len(s.Input.Sugg) != 0 {
+			t.Fatalf("left %d: pos %d sugg %q", i, s.Input.Pos, s.Input.Sugg)
+		}
+	}
+	for i := 1; i <= n; i++ {
+		if s = h.Key("right"); s.Input.Pos != i || len(s.Input.Sugg) != 0 {
+			t.Fatalf("right %d: pos %d sugg %q", i, s.Input.Pos, s.Input.Sugg)
+		}
+	}
+	keys(h, "left", "left", "left", "left") // to the end of at:9
+	if s = h.Key("enter"); s.Input != nil {
+		t.Fatalf("enter completed instead of saving: %+v", s.Input)
+	}
+	if !strings.Contains(h.view(), "Lunch at:9 now") {
+		t.Error("the task wasn't saved as typed")
+	}
+	// Typing brings the list back.
+	s = keys(h, "a", "a", "t", ":", "9")
+	if len(s.Input.Sugg) == 0 {
+		t.Fatal("no suggestions after typing at:9")
 	}
 }
 
@@ -463,21 +500,103 @@ func TestDuePickerOnLongTask(t *testing.T) {
 	}
 }
 
-// A long line scrolls inside the terminal's add popup instead of wrapping
-// onto more lines, while typing and when moving back to the start.
-func TestPopupInputFitsLongText(t *testing.T) {
+// A long task wraps onto more lines of the terminal's add popup, every
+// word of it showing, the later lines lined up under the first, and the
+// box no wider than for a short one.
+func TestPopupInputWrapsLongText(t *testing.T) {
 	m := scriptModel(t, nil)
-	mm, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	mm, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	m = mm.(Model)
 	m.startAdd()
-	want := strings.Count(m.viewTaskPopup(), "\n")
-	m = typeText(m, strings.Repeat("a long task about many things ", 6))
-	if got := strings.Count(m.viewTaskPopup(), "\n"); got != want {
-		t.Fatalf("typing: popup is %d lines, want %d:\n%s", got+1, want+1, m.viewTaskPopup())
+	short := m.viewTaskPopup()
+	lines0, width := strings.Count(short, "\n"), lipgloss.Width(short)
+	long := strings.TrimSpace(strings.Repeat("a long task about many things ", 6)) + " +proj due:2026-12-01"
+	m = typeText(m, long)
+	for _, at := range []string{"end", "home"} {
+		if at == "home" {
+			m = press(m, tea.KeyHome)
+		}
+		v := m.viewTaskPopup()
+		if lipgloss.Width(v) != width {
+			t.Fatalf("%s: popup is %d wide, want %d:\n%s", at, lipgloss.Width(v), width, v)
+		}
+		if got := strings.Count(v, "\n"); got <= lines0 {
+			t.Fatalf("%s: popup didn't grow for the long task:\n%s", at, v)
+		}
+		var text []string
+		for n, l := range strings.Split(ansi.Strip(v), "\n")[3:] {
+			l = strings.Trim(l, "│ ")
+			if l == "" || strings.HasPrefix(l, "─") {
+				break
+			}
+			if n == 0 {
+				l = strings.TrimPrefix(l, "› ")
+			}
+			text = append(text, l)
+		}
+		if got := strings.Join(text, " "); got != long {
+			t.Fatalf("%s: popup shows %q, want %q:\n%s", at, got, long, v)
+		}
 	}
-	m = press(m, tea.KeyHome)
-	if got := strings.Count(m.viewTaskPopup(), "\n"); got != want {
-		t.Fatalf("home: popup is %d lines, want %d:\n%s", got+1, want+1, m.viewTaskPopup())
+}
+
+func TestWrapInput(t *testing.T) {
+	for _, tc := range []struct {
+		in    string
+		width int
+		want  []string
+	}{
+		{"", 5, []string{""}},
+		{"abc", 5, []string{"abc"}},
+		{"abcde", 5, []string{"abcde", ""}}, // the cursor goes on the next line
+		{"ab cd ef", 5, []string{"ab ", "cd ef", ""}},
+		{"abcdefgh ij", 5, []string{"abcde", "fgh ", "ij"}},
+	} {
+		var got []string
+		r := []rune(tc.in)
+		for _, sp := range wrapInput(r, tc.width) {
+			got = append(got, string(r[sp[0]:sp[1]]))
+		}
+		if strings.Join(got, "|") != strings.Join(tc.want, "|") {
+			t.Errorf("wrapInput(%q, %d) = %q, want %q", tc.in, tc.width, got, tc.want)
+		}
+	}
+}
+
+// tab on a +project, rec: or at: word anywhere in the line lists what it
+// could be instead; picking one replaces the whole word.
+func TestTabChangesWord(t *testing.T) {
+	m := scriptModel(t, nil)
+	m.known = []string{"+home", "+work", "@desk"}
+	m.startAdd()
+	m = typeText(m, "Fix it +work rec:1w later")
+	if ws := inputWords(m.input.Value()); len(ws) != 2 || ws[0].kind != "project" || ws[1].kind != "tag" {
+		t.Fatalf("words %+v", ws)
+	}
+	m.input.SetCursor(9) // in the middle of +work
+	m = press(m, tea.KeyTab)
+	if len(m.sugg) != 1 || m.sugg[0] != "+home" {
+		t.Fatalf("tab on +work: suggestions %q", m.sugg)
+	}
+	m = press(m, tea.KeyTab)
+	if v := m.input.Value(); v != "Fix it +home rec:1w later" {
+		t.Fatalf("after picking: %q", v)
+	}
+	m.input.SetCursor(15) // in rec:1w
+	m = press(m, tea.KeyTab)
+	if len(m.sugg) == 0 || m.sugg[0] == "rec:1w" {
+		t.Fatalf("tab on rec:1w: suggestions %q", m.sugg)
+	}
+	pick := m.sugg[1]
+	m = press(m, tea.KeyDown)
+	m = press(m, tea.KeyEnter)
+	if v := m.input.Value(); v != "Fix it +home "+pick+" later" {
+		t.Fatalf("after picking %s: %q", pick, v)
+	}
+	m.input.SetCursor(2) // a plain word: nothing to change
+	m = press(m, tea.KeyTab)
+	if len(m.sugg) != 0 || m.pick != nil {
+		t.Fatalf("tab on a plain word: %q %v", m.sugg, m.pick)
 	}
 }
 

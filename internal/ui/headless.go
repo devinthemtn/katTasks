@@ -296,7 +296,7 @@ func (h *Headless) SetInputCursor(pos int) Snapshot {
 	return h.do(func(m *Model) tea.Cmd {
 		if m.input.Focused() {
 			m.input.SetCursor(pos)
-			m.updateSuggestions()
+			m.sugg, m.suggIdx = nil, 0 // as moving it with the arrows does
 		}
 		return nil
 	})

@@ -14,6 +14,7 @@ export type {
     HelpCol,
     HelpRow,
     Input,
+    InputWord,
     PaletteRow,
     PickDay,
     Seg,

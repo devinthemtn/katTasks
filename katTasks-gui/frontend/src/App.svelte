@@ -5,7 +5,7 @@
   import { onMount, tick } from 'svelte';
   import { Clipboard, Events } from '@wailsio/runtime';
   import * as api from '../bindings/github.com/devinthemtn/katTasks/katTasks-gui/tasksservice';
-  import type { Snapshot, Seg, TaskRow, SideRow } from '../bindings/github.com/devinthemtn/katTasks/internal/ui/models';
+  import type { Snapshot, Seg, TaskRow, SideRow, InputWord } from '../bindings/github.com/devinthemtn/katTasks/internal/ui/models';
   import { teaKey, isPaste, zoomStep } from './keys';
   import { pieces, isButton } from './footer';
   import Text from './Text.svelte';
@@ -145,6 +145,37 @@
     send(() => api.SetInputCursor(Math.max(0, pos)));
   }
 
+  // Clicking in the add/edit popup's input, which wraps onto more lines,
+  // moves its cursor to the character under the pointer.
+  function clickWrapped(e: MouseEvent) {
+    const el = e.currentTarget as HTMLElement;
+    const d = document as Document & {
+      caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    };
+    let node: Node | null = null;
+    let off = 0;
+    if (d.caretPositionFromPoint) {
+      const p = d.caretPositionFromPoint(e.clientX, e.clientY);
+      if (p) [node, off] = [p.offsetNode, p.offset];
+    } else if (d.caretRangeFromPoint) {
+      const r = d.caretRangeFromPoint(e.clientX, e.clientY);
+      if (r) [node, off] = [r.startContainer, r.startOffset];
+    }
+    if (!node || !el.contains(node)) return;
+    let pos = 0;
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+      const text = t.textContent ?? '';
+      if (t === node) {
+        pos += [...text.slice(0, off)].length;
+        break;
+      }
+      pos += [...text].length;
+    }
+    send(() => api.SetInputCursor(Math.max(0, pos)));
+  }
+
   // ---- drawing helpers ------------------------------------------------------
 
   const colors = $derived(s ? (dark ? s.colors.dark : s.colors.light) : {});
@@ -164,6 +195,28 @@
   function caret(value: string, pos: number) {
     const r = [...value];
     return { before: r.slice(0, pos).join(''), at: r[pos] ?? ' ', after: r.slice(pos + 1).join('') };
+  }
+
+  // The add/edit input in pieces: the cursor, the words tab can change
+  // (underlined, in their colours) and the text between.
+  function inputPieces(value: string, pos: number, words: InputWord[] | null) {
+    const r = [...value];
+    const kind: string[] = r.map(() => '');
+    for (const w of words ?? []) for (let i = w.start; i < w.end && i < r.length; i++) kind[i] = w.kind;
+    const out: { text: string; cls: string }[] = [];
+    for (let i = 0; i < r.length; ) {
+      if (i === pos) {
+        out.push({ text: r[i], cls: 'caret' });
+        i++;
+        continue;
+      }
+      let j = i;
+      while (j < r.length && j !== pos && kind[j] === kind[i]) j++;
+      out.push({ text: r.slice(i, j).join(''), cls: kind[i] ? `c-${kind[i]} changeable` : '' });
+      i = j;
+    }
+    if (pos >= r.length) out.push({ text: ' ', cls: 'caret' });
+    return out;
   }
 
   // Keep the cursor of a long input in view.
@@ -354,8 +407,8 @@
     {#snippet popupButtons()}
       <button class="btn pos on" onclick={() => key('enter')}><span>Save</span><kbd>enter</kbd></button>
       <button class="btn neg" onclick={() => key('esc')}><span>Cancel</span><kbd>esc</kbd></button>
-      <button class="btn" onclick={() => key('tab')}><span>Complete</span><kbd>tab</kbd></button>
-      <span class="dim">&nbsp;<span class="bold">←→↑↓</span> choose</span>
+      <button class="btn" onclick={() => key('tab')}><span>Complete / change <span class="changeable">this</span></span><kbd>tab</kbd></button>
+      <span class="dim">&nbsp;<span class="bold">↑↓</span> choose</span>
     {/snippet}
 
     <!-- add / edit popup -->
@@ -364,7 +417,7 @@
         <div class="pane focused popup" onclick={(e) => e.stopPropagation()} role="dialog" aria-label={s.input.label}>
           <div class="line prompt">{s.input.label}</div>
           <div class="line">&nbsp;</div>
-          <div class="line"><span class="prompt">›&nbsp;</span><span class="input grow" use:followCaret onclick={clickInput} role="textbox" tabindex="-1">{caret(s.input.value, s.input.pos).before}<span class="caret">{caret(s.input.value, s.input.pos).at}</span>{caret(s.input.value, s.input.pos).after}</span></div>
+          <div class="line wrapline"><span class="prompt">›&nbsp;</span><span class="input grow wrapped" onclick={clickWrapped} role="textbox" tabindex="-1">{#each inputPieces(s.input.value, s.input.pos, s.input.words) as p}<span class={p.cls}>{p.text}</span>{/each}</span></div>
           <div class="line">
             {#each s.input.sugg ?? [] as g, i}<span class={i === s.input.suggIdx ? 'chip' : 'dim sugg'} onclick={() => pick(i, true)} role="button" tabindex="-1">{i === s.input.suggIdx ? g : ` ${g} `}</span>{/each}{#if s.input.suggDesc}<span class="dim">&nbsp;&nbsp;{s.input.suggDesc}</span>{/if}&nbsp;
           </div>

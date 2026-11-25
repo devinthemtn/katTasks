@@ -242,7 +242,12 @@ Adding (`a`) or editing a task opens a small box in the middle of the screen,
 with a reminder of the `(A)`, `+project`, `@context`, `due:`, `rec:`,
 `alarm:`, `at:` and `status:` / `progress:` syntax underneath. While typing a
 task, `tab` (or `enter`) completes `+project`, `@context`, `due:`, `rec:` and
-`at:` words; `←→` or `↑↓` choose among the suggestions.
+`at:` words; `↑↓` choose among the suggestions, and `←→` always move the
+cursor. The suggestions show while you type, not when you only move the cursor.
+Those words are underlined in the box: `tab` with the cursor anywhere on one
+changes it, listing the other projects, contexts, `rec:` intervals or `at:`
+times to replace the whole word with (or opening the `due:` / `alarm:`
+picker). A long task wraps onto more lines of the box, so all of it shows.
 `at:` offers the next half hours, and the times that fit what you've typed
 (`at:9` → `at:900`, `at:915`…; `at:3p` → `at:3pm`). Typing `alarm:` opens a
 [date and time picker](#alarms).

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.0.3 (2026-11-25)
 
 - `-v` works as `-version` does, in `katTasks` and `katTasks-gui`.
 - New `files.watch` setting: while open, katTasks and katTasks-gui recheck
